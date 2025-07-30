@@ -11,12 +11,15 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Get the project root directory (parent of scripts directory)
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CONFIG_FILE="$PROJECT_ROOT/.env"
+
 # Load configuration
-CONFIG_FILE=".env"
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
-    echo -e "${RED}[ERROR]${NC} Configuration file not found."
+    echo -e "${RED}[ERROR]${NC} Configuration file not found at $CONFIG_FILE"
     exit 1
 fi
 
@@ -89,7 +92,8 @@ echo ""
 echo "3. File upload (original functionality):"
 echo 'curl -X POST -F '"'"'file=@audio.mp3'"'"' http://your-api:8000/transcribe'
 # Load next-step helper and show next step
-if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
-    source "$(dirname "$0")/next-step-helper.sh"
-    show_next_step "$0" "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/next-step-helper.sh" ]; then
+    source "$SCRIPT_DIR/next-step-helper.sh"
+    show_next_step "$0" "$SCRIPT_DIR"
 fi
