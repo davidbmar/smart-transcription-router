@@ -57,6 +57,35 @@ get_input() {
     fi
 }
 
+# Function to get user input with validation choices
+get_choice() {
+    local prompt=$1
+    local default=$2
+    local var_name=$3
+    shift 3
+    local valid_choices=("$@")
+    
+    while true; do
+        get_input "$prompt" "$default" "$var_name"
+        local value=$(eval echo "\$$var_name")
+        
+        # Check if value is in valid choices
+        local is_valid=false
+        for choice in "${valid_choices[@]}"; do
+            if [ "$value" = "$choice" ]; then
+                is_valid=true
+                break
+            fi
+        done
+        
+        if [ "$is_valid" = true ]; then
+            break
+        else
+            print_error "Invalid choice: '$value'. Valid options are: ${valid_choices[*]}"
+        fi
+    done
+}
+
 # Function to validate AWS region
 validate_region() {
     local region=$1
@@ -124,7 +153,7 @@ while ! validate_region "$AWS_REGION"; do
     get_input "Please enter a valid AWS Region" "us-east-2" AWS_REGION
 done
 
-get_input "Environment name (dev/staging/prod)" "dev" ENVIRONMENT
+get_choice "Environment name (dev/staging/prod)" "dev" ENVIRONMENT "dev" "staging" "prod"
 
 # Queue Configuration
 print_header "SQS Queue Configuration"
@@ -188,7 +217,7 @@ echo "  'stop'      - Pause instance when idle (keeps disk/config, fast restart)
 echo "  'terminate' - Destroy instance when idle (fresh start each time)"
 echo "  'none'      - Keep running forever (highest cost)"
 echo ""
-get_input "Worker shutdown behavior" "stop" WORKER_IDLE_SHUTDOWN
+get_choice "Worker shutdown behavior (stop/terminate/none)" "stop" WORKER_IDLE_SHUTDOWN "stop" "terminate" "none"
 
 get_input "Idle timeout before shutdown (minutes, 0=disabled)" "5" IDLE_TIMEOUT_MINUTES
 get_input "Default chunk size (seconds)" "30" CHUNK_SIZE
