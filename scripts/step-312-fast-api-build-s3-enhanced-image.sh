@@ -85,7 +85,7 @@ echo "• POST /transcribe - Original file upload (unchanged)"
 echo
 
 # Load next-step helper and show next step
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$PROJECT_ROOT/scripts"
 if [ -f "$SCRIPT_DIR/next-step-helper.sh" ]; then
     source "$SCRIPT_DIR/next-step-helper.sh"
     show_next_step "$0" "$SCRIPT_DIR"

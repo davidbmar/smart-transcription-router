@@ -91,8 +91,8 @@ echo '  -d '"'"'{"audio_url": "https://example.com/audio.mp3"}'"'"
 echo ""
 echo "3. File upload (original functionality):"
 echo 'curl -X POST -F '"'"'file=@audio.mp3'"'"' http://your-api:8000/transcribe'
-# Load next-step helper and show next step
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Load next-step helper and show next step  
+SCRIPT_DIR="$PROJECT_ROOT/scripts"
 if [ -f "$SCRIPT_DIR/next-step-helper.sh" ]; then
     source "$SCRIPT_DIR/next-step-helper.sh"
     show_next_step "$0" "$SCRIPT_DIR"
