@@ -1,0 +1,36 @@
+# Script Descriptions for Smart Transcription Router
+
+## Phase 1: Basic Setup
+step-000-setup-configuration.sh - Interactive configuration setup for transcription system
+step-001-validate-configuration.sh - Validate environment configuration and AWS connectivity
+step-005-setup-vad-model.sh - Download and setup Voice Activity Detection model
+step-010-setup-iam-permissions.sh - Create IAM roles and policies for transcription services
+step-011-validate-iam-permissions.sh - Verify IAM permissions are correctly configured
+step-020-create-sqs-resources.sh - Create SQS queues and metrics bucket for batch processing
+step-021-validate-sqs-resources.sh - Test SQS queue functionality and permissions
+
+## Phase 2: FastAPI Deployment
+step-060-choose-deployment-path.sh - Interactive deployment path selection guide
+step-300-fast-api-smart-deploy.sh - Automated FastAPI deployment orchestrator
+step-300-scripts-for-fast-api-transcription.sh - FastAPI deployment script collection overview
+step-301-fast-api-setup-ecr-repository.sh - Create ECR repository for FastAPI Docker images
+step-302-fast-api-validate-ecr-configuration.sh - Verify ECR repository and access
+step-310-fast-api-build-gpu-docker-image.sh - Build FastAPI Docker image for GPU instances
+step-311-fast-api-push-image-to-ecr.sh - Push FastAPI image to ECR repository
+step-312-fast-api-build-s3-enhanced-image.sh - Build S3-enhanced FastAPI Docker image
+step-313-fast-api-push-s3-image.sh - Push S3-enhanced image to ECR repository
+step-320-fast-api-launch-gpu-instances.sh - Launch GPU instances with FastAPI containers
+step-325-fast-api-fix-ssh-access.sh - Fix SSH access issues for FastAPI instances
+step-326-fast-api-check-gpu-health.sh - Verify GPU instance health and container status
+step-327-fast-api-fix-iam-and-restart.sh - Fix IAM permissions and restart containers
+step-330-fast-api-test-transcription.sh - Test FastAPI transcription endpoints
+
+## Phase 3: Smart Router
+step-340-deploy-lambda-router.sh - Deploy Lambda router for intelligent transcription routing
+step-341-configure-eventbridge-trigger.sh - Configure EventBridge triggers for Lambda router
+step-342-test-lambda-router.sh - Test Lambda router functionality and routing logic
+
+## Testing & Cleanup
+step-041-test-complete-workflow.sh - End-to-end workflow testing
+step-999-terminate-workers-or-selective-cleanup.sh - Selective resource cleanup
+step-999-destroy-all-resources-complete-teardown.sh - Complete infrastructure teardown

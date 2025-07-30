@@ -1,0 +1,54 @@
+Smart Transcription Router Architecture
+======================================
+
+                    ┌─────────────────────────┐
+                    │   Audio Upload Event    │
+                    │    (EventBridge)        │
+                    └───────────┬─────────────┘
+                                │
+                                ▼
+                    ┌─────────────────────────┐
+                    │    Lambda Router        │
+                    │  ┌─────────────────┐   │
+                    │  │ Health Check    │   │
+                    │  │ if server_up:   │   │
+                    │  │   → HTTP        │   │
+                    │  │ else:           │   │
+                    │  │   → SQS         │   │
+                    │  └─────────────────┘   │
+                    └───────┬───────┬─────────┘
+                            │       │
+                    Server UP│       │Server DOWN
+                            │       │
+                            ▼       ▼
+                    ┌────────────┐ ┌────────────┐
+                    │  FastAPI   │ │    SQS     │
+                    │  Server    │ │   Queue    │
+                    │            │ └──────┬─────┘
+                    │ GPU-based  │        │
+                    │ Real-time  │        │ Batch
+                    │            │        │
+                    └────────────┘        ▼
+                                 ┌────────────────┐
+                                 │ Batch Worker   │
+                                 │                │
+                                 │ • Scheduled    │
+                                 │ • On-demand    │
+                                 │ • Processes    │
+                                 │   SQS Queue    │
+                                 └────────────────┘
+
+Flow Details:
+============
+
+1. Real-time Path (Server Running):
+   Audio → EventBridge → Lambda → FastAPI → Transcription Result
+
+2. Batch Path (Server Down/Deferred):
+   Audio → EventBridge → Lambda → SQS → Worker → Transcription Result
+
+3. Hybrid Benefits:
+   • Low latency when needed (direct HTTP)
+   • Cost efficient when idle (no GPU running)
+   • Reliable queuing for batch jobs
+   • Automatic failover between modes
