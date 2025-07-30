@@ -2,6 +2,12 @@
 
 # next-step-helper.sh - Generic function to automatically determine next script in sequence
 
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
 # Function to show the next step in the sequence
 show_next_step() {
     local current_script="$1"
@@ -42,23 +48,25 @@ show_next_step() {
         fi
     done
     
-    # Display results
     echo ""
-    echo "📋 NEXT STEP IN SEQUENCE:"
+    echo -e "${GREEN}======================================${NC}"
+    echo -e "${GREEN}🎯 NEXT STEP${NC}"
+    echo -e "${GREEN}======================================${NC}"
+    
     if [ -n "$next_script" ]; then
         local next_name=$(basename "$next_script")
         # Show path relative to current working directory
         local current_dir=$(basename "$(pwd)")
         if [[ "$current_dir" != "scripts" ]]; then
-            echo "   ./scripts/$next_name"
+            echo -e "${BLUE}Run:${NC} ./scripts/$next_name"
         else
-            echo "   ./$next_name"
+            echo -e "${BLUE}Run:${NC} ./$next_name"
         fi
         
         # Try to get a description from the script header
         local description=$(head -5 "$next_script" 2>/dev/null | grep -E '^#.*-.*' | head -1 | sed 's/^#[[:space:]]*//' | sed 's/step-[0-9]*-[^[:space:]]*//' | sed 's/^[[:space:]]*//')
         if [ -n "$description" ]; then
-            echo "   📝 $description"
+            echo -e "${CYAN}Purpose:${NC} $description"
         fi
     else
         # Check if we're at the end of this series

@@ -17,8 +17,8 @@ step-301-fast-api-setup-ecr-repository.sh - Create ECR repository for FastAPI Do
 step-302-fast-api-validate-ecr-configuration.sh - Verify ECR repository and access
 step-310-fast-api-build-gpu-docker-image.sh - Build FastAPI Docker image for GPU instances
 step-311-fast-api-push-image-to-ecr.sh - Push FastAPI image to ECR repository
-step-312-fast-api-build-s3-enhanced-image.sh - Build S3-enhanced FastAPI Docker image
-step-313-fast-api-push-s3-image.sh - Push S3-enhanced image to ECR repository
+step-312-fast-api-build-s3-enhanced-image.sh - Build FastAPI Docker image with S3 support for GPU transcription
+step-313-fast-api-push-s3-image.sh - Push S3-enhanced FastAPI Docker image to ECR registry
 step-320-fast-api-launch-gpu-instances.sh - Launch GPU instances with FastAPI containers
 step-325-fast-api-fix-ssh-access.sh - Fix SSH access issues for FastAPI instances
 step-326-fast-api-check-gpu-health.sh - Verify GPU instance health and container status
