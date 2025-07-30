@@ -11,12 +11,15 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Get the project root directory (parent of scripts directory)
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CONFIG_FILE="$PROJECT_ROOT/.env"
+
 # Load configuration
-CONFIG_FILE=".env"
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
-    echo -e "${RED}[ERROR]${NC} Configuration file not found."
+    echo -e "${RED}[ERROR]${NC} Configuration file not found at $CONFIG_FILE"
     exit 1
 fi
 
@@ -80,14 +83,7 @@ echo "• POST /transcribe-s3 - Direct S3 input/output"
 echo "• POST /transcribe-url - Any URL (including presigned)"
 echo "• POST /transcribe - Original file upload (unchanged)"
 echo
-echo -e "${GREEN}[NEXT STEPS]${NC}"
-echo "1. Push to ECR:"
-echo "   ./scripts/step-313-fast-api-push-s3-image.sh"
-echo
-echo "2. Deploy with S3 support:"
-echo "   ./scripts/step-300-fast-api-smart-deploy.sh --tag=s3-enhanced"
-echo
-echo -e "${YELLOW}[NOTE]${NC} The 'fixed' tag still works but lacks S3 support"
+
 # Load next-step helper and show next step
 if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
     source "$(dirname "$0")/next-step-helper.sh"
