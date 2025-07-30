@@ -212,8 +212,8 @@ print_header "Worker Configuration"
 get_input "Default Whisper model" "large-v3" WHISPER_MODEL
 
 echo ""
-echo -e "${CYAN}Worker Idle Shutdown Behavior:${NC}"
-echo "  'stop'      - Pause instance when idle (keeps disk/config, fast restart) ${GREEN}[Recommended]${NC}"
+echo "Worker Idle Shutdown Behavior:"
+echo "  'stop'      - Pause instance when idle (keeps disk/config, fast restart) [Recommended]"
 echo "  'terminate' - Destroy instance when idle (fresh start each time)"
 echo "  'none'      - Keep running forever (highest cost)"
 echo ""
