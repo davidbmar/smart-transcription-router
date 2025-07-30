@@ -181,7 +181,16 @@ read
 print_header "Worker Configuration"
 
 get_input "Default Whisper model" "large-v3" WHISPER_MODEL
-get_input "Worker idle timeout (minutes)" "5" IDLE_TIMEOUT_MINUTES
+
+echo ""
+echo -e "${CYAN}Worker Idle Shutdown Behavior:${NC}"
+echo "  'stop'      - Pause instance when idle (keeps disk/config, fast restart) ${GREEN}[Recommended]${NC}"
+echo "  'terminate' - Destroy instance when idle (fresh start each time)"
+echo "  'none'      - Keep running forever (highest cost)"
+echo ""
+get_input "Worker shutdown behavior" "stop" WORKER_IDLE_SHUTDOWN
+
+get_input "Idle timeout before shutdown (minutes, 0=disabled)" "5" IDLE_TIMEOUT_MINUTES
 get_input "Default chunk size (seconds)" "30" CHUNK_SIZE
 
 # EC2/Spot Configuration
