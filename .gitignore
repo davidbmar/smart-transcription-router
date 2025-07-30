@@ -2,6 +2,7 @@
 .env
 *.env
 .env.*
+!.env.template
 
 # AWS configurations
 .aws/
