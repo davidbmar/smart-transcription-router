@@ -89,13 +89,6 @@ echo
 echo -e "${BLUE}======================================${NC}"
 if [ $VALIDATION_PASSED -eq 1 ]; then
     echo -e "${GREEN}✓ Fast API ECR validation PASSED${NC}"
-    echo
-    echo -e "${GREEN}[NEXT STEPS]${NC}"
-    echo "1. Build Fast API image:"
-    echo "   ./scripts/step-310-fast-api-build-gpu-docker-image.sh"
-    echo
-    echo "2. Push to ECR:"
-    echo "   ./scripts/step-311-fast-api-push-image-to-ecr.sh"
 else
     echo -e "${RED}✗ Fast API ECR validation FAILED${NC}"
     echo
@@ -103,9 +96,10 @@ else
 fi
 echo -e "${BLUE}======================================${NC}"
 
-exit $((1 - VALIDATION_PASSED))
 # Load next-step helper and show next step
-if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
+if [ $VALIDATION_PASSED -eq 1 ] && [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
     source "$(dirname "$0")/next-step-helper.sh"
     show_next_step "$0" "$(dirname "$0")"
 fi
+
+exit $((1 - VALIDATION_PASSED))
