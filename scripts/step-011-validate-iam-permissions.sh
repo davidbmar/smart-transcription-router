@@ -99,9 +99,9 @@ check_status "IAM configuration file exists" \
     "Should be created by step-010-setup-iam-permissions.sh"
 
 # Check 11: Setup status updated
-check_status "Step 011 marked complete" \
-    "grep -q 'STEP_011_COMPLETE=' .setup-status" \
-    "Run ./scripts/step-010-setup-iam-permissions.sh"
+check_status "Step 010 marked complete" \
+    "grep -q 'STEP_010_COMPLETE=' .setup-status" \
+    "Verify ./scripts/step-010-setup-iam-permissions.sh ran successfully"
 
 # Check 12: Test assume role (if we can)
 echo -e "${YELLOW}[INFO]${NC} Testing role assume capability..."
