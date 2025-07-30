@@ -8,7 +8,8 @@ set -e
 source "$(dirname "$0")/common-functions.sh"
 
 # Load configuration
-load_config
+CONFIG_FILE=".env"
+load_config "$CONFIG_FILE"
 
 # Use configuration values (no more hardcoded defaults)
 QUEUE_NAME="${QUEUE_NAME}"
