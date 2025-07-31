@@ -488,18 +488,22 @@ echo "1. Run ./scripts/step-020-create-sqs-resources.sh to create SQS queues"
 echo "2. The IAM permissions are now configured for all transcription operations"
 echo ""
 
-# Save configuration
-cat > iam-config.env << EOF
-# IAM Configuration
-export AWS_ACCOUNT_ID="$ACCOUNT_ID"
-export IAM_USER="$IAM_USER"
-export USER_POLICY_ARN="$POLICY_ARN"
-export WORKER_ROLE_NAME="$ROLE_NAME"
-export WORKER_INSTANCE_PROFILE="$INSTANCE_PROFILE_NAME"
-export WORKER_POLICY_ARN="$WORKER_POLICY_ARN"
-EOF
-
-print_status "IAM configuration saved to iam-config.env"
+# Add IAM configuration to .env file if not already present
+if ! grep -q "WORKER_INSTANCE_PROFILE" "$CONFIG_FILE"; then
+    echo "" >> "$CONFIG_FILE"
+    echo "# IAM Configuration (added by step-010)" >> "$CONFIG_FILE"
+    echo "export AWS_ACCOUNT_ID=\"$ACCOUNT_ID\"" >> "$CONFIG_FILE"
+    echo "export USER_POLICY_ARN=\"$POLICY_ARN\"" >> "$CONFIG_FILE"
+    echo "export WORKER_ROLE_NAME=\"$ROLE_NAME\"" >> "$CONFIG_FILE"
+    echo "export WORKER_INSTANCE_PROFILE=\"$INSTANCE_PROFILE_NAME\"" >> "$CONFIG_FILE"
+    echo "export WORKER_POLICY_ARN=\"$WORKER_POLICY_ARN\"" >> "$CONFIG_FILE"
+    print_status "IAM configuration added to .env"
+else
+    # Update existing values
+    sed -i "s|AWS_ACCOUNT_ID=.*|AWS_ACCOUNT_ID=\"$ACCOUNT_ID\"|" "$CONFIG_FILE"
+    sed -i "s|WORKER_INSTANCE_PROFILE=.*|WORKER_INSTANCE_PROFILE=\"$INSTANCE_PROFILE_NAME\"|" "$CONFIG_FILE"
+    print_status "IAM configuration updated in .env"
+fi
 
 # Load next-step helper and show next step
 if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then

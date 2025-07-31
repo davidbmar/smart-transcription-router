@@ -33,7 +33,7 @@ fi
 
 # Verify EC2 configuration
 if [ -z "$SECURITY_GROUP_ID" ] || [ -z "$KEY_NAME" ] || [ -z "$SUBNET_ID" ]; then
-    echo -e "${RED}[ERROR]${NC} EC2 configuration missing. Run step-202-docker-setup-ec2-network-and-security.sh first."
+    echo -e "${RED}[ERROR]${NC} EC2 configuration missing. Run step-025-setup-ec2-configuration.sh first."
     exit 1
 fi
 
@@ -207,7 +207,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --key-name "$KEY_NAME" \
     --security-group-ids "$SECURITY_GROUP_ID" \
     --subnet-id "$SUBNET_ID" \
-    --iam-instance-profile Name="$INSTANCE_PROFILE" \
+    --iam-instance-profile Name="$WORKER_INSTANCE_PROFILE" \
     --user-data "$USER_DATA" \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=fast-api-gpu-worker},{Key=Type,Value=fast-api-worker},{Key=Project,Value=$QUEUE_PREFIX}]" \
     --metadata-options "HttpTokens=optional,HttpPutResponseHopLimit=2" \
