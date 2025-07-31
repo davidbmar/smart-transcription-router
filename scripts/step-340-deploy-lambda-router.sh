@@ -143,7 +143,7 @@ if aws lambda get-function --function-name "$FUNCTION_NAME" 2>/dev/null; then
         --function-name "$FUNCTION_NAME" \
         --timeout 30 \
         --memory-size 512 \
-        --environment "Variables={SQS_QUEUE_URL=$SQS_QUEUE_URL,FAST_API_TAG=fast-api-worker,AWS_REGION=$AWS_REGION}" \
+        --environment "Variables={SQS_QUEUE_URL=$SQS_QUEUE_URL,FAST_API_TAG=fast-api-worker}" \
         --region "$AWS_REGION"
 else
     echo -e "${YELLOW}[INFO]${NC} Creating new Lambda function..."
@@ -155,7 +155,7 @@ else
         --zip-file fileb://lambda-deployment.zip \
         --timeout 30 \
         --memory-size 512 \
-        --environment "Variables={SQS_QUEUE_URL=$SQS_QUEUE_URL,FAST_API_TAG=fast-api-worker,AWS_REGION=$AWS_REGION}" \
+        --environment "Variables={SQS_QUEUE_URL=$SQS_QUEUE_URL,FAST_API_TAG=fast-api-worker}" \
         --description "Routes transcription requests to FastAPI or SQS" \
         --region "$AWS_REGION"
 fi
