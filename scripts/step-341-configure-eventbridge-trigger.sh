@@ -42,15 +42,15 @@ echo -e "${GREEN}[STEP 1]${NC} Creating EventBridge rule..."
 
 RULE_NAME="${QUEUE_PREFIX}-audio-upload-rule"
 
-# Create rule for audio upload events
+# Create rule for audio upload events (supports both test and web app formats)
 aws events put-rule \
     --name "$RULE_NAME" \
     --event-bus-name "$EVENT_BUS_NAME" \
     --event-pattern '{
-        "source": ["audio.upload"],
-        "detail-type": ["Audio Upload Completed"]
+        "source": ["audio.upload", "custom.upload-service"],
+        "detail-type": ["Audio Upload Completed", "Audio Uploaded"]
     }' \
-    --description "Route audio uploads to transcription router" \
+    --description "Route audio uploads to transcription router (test and web app events)" \
     --state ENABLED \
     --region "$AWS_REGION"
 

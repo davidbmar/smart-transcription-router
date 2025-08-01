@@ -1,0 +1,28 @@
+# Core transcription dependencies
+torch>=2.0.0
+torchaudio>=2.0.0
+torchvision
+openai-whisper>=20231117
+faster-whisper>=0.10.0,<1.0.0
+git+https://github.com/m-bain/whisperx.git@v3.1.0
+
+# AWS and cloud dependencies
+boto3>=1.28.0
+botocore>=1.29.0
+
+# Audio processing
+soundfile>=0.12.1
+ffmpeg-python>=0.2.0
+pydub>=0.25.1
+
+# ML and data processing
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+pandas>=2.0.0
+
+# Utility and CLI
+click>=8.0.0
+requests>=2.31.0
+coloredlogs>=15.0.0
+Pillow>=10.0.0

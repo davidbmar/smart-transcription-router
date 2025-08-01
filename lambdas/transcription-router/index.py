@@ -54,9 +54,14 @@ def check_server_health(server_url):
 def send_to_fastapi(server_url, event_data):
     """Send transcription request directly to FastAPI server"""
     try:
-        # Extract S3 information from event
+        # Extract S3 information from event (handle both formats)
         s3_bucket = event_data.get('s3_bucket')
         s3_key = event_data.get('s3_key')
+        
+        # Check for cognito-lambda-s3 event format
+        if not s3_bucket and event_data.get('s3Location'):
+            s3_bucket = event_data['s3Location'].get('bucket')
+            s3_key = event_data['s3Location'].get('key')
         
         if not s3_bucket or not s3_key:
             raise ValueError("Missing S3 bucket or key in event data")
@@ -94,9 +99,17 @@ def send_to_fastapi(server_url, event_data):
 def send_to_sqs(event_data):
     """Send transcription request to SQS queue"""
     try:
+        # Normalize event data format for SQS
+        normalized_data = event_data.copy()
+        
+        # Handle cognito-lambda-s3 format
+        if 's3Location' in event_data and 's3_bucket' not in event_data:
+            normalized_data['s3_bucket'] = event_data['s3Location'].get('bucket')
+            normalized_data['s3_key'] = event_data['s3Location'].get('key')
+        
         # Add metadata for batch processing
         message_body = {
-            **event_data,
+            **normalized_data,
             'queued_at': datetime.utcnow().isoformat(),
             'processing_type': 'batch'
         }
