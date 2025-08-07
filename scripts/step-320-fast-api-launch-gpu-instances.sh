@@ -226,7 +226,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --subnet-id "$SUBNET_ID" \
     --iam-instance-profile Name="$WORKER_INSTANCE_PROFILE" \
     --user-data "$USER_DATA" \
-    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=fast-api-gpu-worker},{Key=Type,Value=fast-api-worker},{Key=Project,Value=$QUEUE_PREFIX},{Key=ImageTag,Value=$IMAGE_TAG}]" \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=fast-api-gpu-worker},{Key=Type,Value=fast-api-worker},{Key=Project,Value=$QUEUE_PREFIX},{Key=ImageTag,Value=$FAST_API_DOCKER_IMAGE_TAG}]" \
     --metadata-options "HttpTokens=optional,HttpPutResponseHopLimit=2" \
     --region "$AWS_REGION" \
     --query 'Instances[0].InstanceId' \
@@ -280,11 +280,11 @@ echo
 echo -e "${YELLOW}[NOTE]${NC} Wait 3-5 minutes for setup to complete"
 echo
 echo -e "${GREEN}[NEXT STEPS]${NC}"
-echo "1. Check instance health:"
-echo "   ./scripts/step-326-fast-api-check-gpu-health.sh"
+echo "1. Wait for instance to be ready (RECOMMENDED):"
+echo "   ./scripts/step-325-wait-for-gpu-instance-ready.sh"
 echo
-echo "2. Test voice transcription:"
-echo "   ./scripts/step-330-fast-api-test-transcription.sh"
+echo "2. Or manually check health after 5-10 minutes:"
+echo "   ./scripts/step-326-fast-api-check-gpu-health.sh"
 echo
 echo -e "${GREEN}[QUICK USAGE EXAMPLES]${NC}"
 echo "S3 to S3 transcription:"

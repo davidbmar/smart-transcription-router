@@ -66,16 +66,29 @@ log_success "ECR login successful" "$SCRIPT_NAME"
 # Push images
 log_info "Pushing images to ECR..." "$SCRIPT_NAME"
 
-log_info "Pushing s3-enhanced tag..." "$SCRIPT_NAME"
-if ! docker push $FAST_API_ECR_REPOSITORY_URI:s3-enhanced; then
-    log_error "Failed to push s3-enhanced image" "$SCRIPT_NAME"
+# Get the configured image tag
+IMAGE_TAG="$FAST_API_DOCKER_IMAGE_TAG"
+if [ -z "$IMAGE_TAG" ]; then
+    IMAGE_TAG="latest-s3"
+    log_warning "No FAST_API_DOCKER_IMAGE_TAG configured, using default: $IMAGE_TAG" "$SCRIPT_NAME"
+fi
+
+log_info "Pushing image with tag: $IMAGE_TAG" "$SCRIPT_NAME"
+if ! docker push $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG; then
+    log_error "Failed to push image with tag $IMAGE_TAG" "$SCRIPT_NAME"
     exit 1
 fi
 
-log_info "Pushing latest-s3 tag..." "$SCRIPT_NAME"
-if ! docker push $FAST_API_ECR_REPOSITORY_URI:latest-s3; then
-    log_error "Failed to push latest-s3 image" "$SCRIPT_NAME"
-    exit 1
+# Also push as latest-s3 for backward compatibility
+log_info "Pushing latest-s3 alias..." "$SCRIPT_NAME"
+if ! docker tag $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG $FAST_API_ECR_REPOSITORY_URI:latest-s3; then
+    log_warning "Failed to tag as latest-s3, continuing..." "$SCRIPT_NAME"
+else
+    if ! docker push $FAST_API_ECR_REPOSITORY_URI:latest-s3; then
+        log_warning "Failed to push latest-s3 alias, continuing..." "$SCRIPT_NAME"
+    else
+        log_success "Also tagged as latest-s3" "$SCRIPT_NAME"
+    fi
 fi
 
 log_success "All images pushed successfully" "$SCRIPT_NAME"
