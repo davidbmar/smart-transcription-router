@@ -70,7 +70,7 @@ load_config() {
         print_status "Configuration loaded from $config_file"
     else
         print_error "Configuration file not found: $config_file"
-        echo "Run step-000-setup-configuration.sh first."
+        echo "Run ./scripts/step-000-setup-configuration.sh first."
         exit 1
     fi
 }

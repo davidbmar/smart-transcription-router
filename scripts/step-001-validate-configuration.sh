@@ -85,7 +85,7 @@ if [ -f ".env" ]; then
     if [ -f ".setup-status" ]; then
         check_status "Step 000 marked complete in setup status" \
             "grep -q 'STEP_000_COMPLETE=' .setup-status" \
-            "Run step-000-setup-configuration.sh again"
+            "Run ./scripts/step-000-setup-configuration.sh again"
     fi
 fi
 

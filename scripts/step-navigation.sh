@@ -80,7 +80,7 @@ show_next_step() {
         local next_script_name=$(basename "$next_step")
         local description=$(get_step_description "$next_step")
         
-        echo -e "${BLUE}Run:${NC} ./$next_script_name"
+        echo -e "${BLUE}Run:${NC} ./scripts/$next_script_name"
         echo -e "${CYAN}Purpose:${NC} $description"
     else
         # Special handling for last steps
