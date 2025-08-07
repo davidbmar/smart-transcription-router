@@ -1,15 +1,32 @@
 #!/bin/bash
 
 # step-313-fast-api-push-s3-image.sh - Push S3-enhanced Fast API image to ECR
+# This script pushes the S3-enhanced Docker image to ECR repository
+# Prerequisites: step-312 (build S3-enhanced image)
+# Outputs: Docker images pushed to ECR with s3-enhanced and latest-s3 tags
 
-set -e
+# Source framework libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/error-handling.sh" ]; then
+    source "$SCRIPT_DIR/error-handling.sh"
+else
+    echo "Error handling library not found, using basic error handling"
+    set -e
+fi
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+if [ -f "$SCRIPT_DIR/step-navigation.sh" ]; then
+    source "$SCRIPT_DIR/step-navigation.sh"
+fi
+
+# Initialize script
+SCRIPT_NAME="step-313-fast-api-push-s3-image"
+setup_error_handling "$SCRIPT_NAME"
+create_checkpoint "$SCRIPT_NAME" "in_progress" "$SCRIPT_NAME"
+
+# Show step purpose
+if declare -f show_step_purpose > /dev/null 2>&1; then
+    show_step_purpose "$0"
+fi
 
 # Get the project root directory (parent of scripts directory)
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,8 +35,9 @@ CONFIG_FILE="$PROJECT_ROOT/.env"
 # Load configuration
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
+    log_info "Configuration loaded" "$SCRIPT_NAME"
 else
-    echo -e "${RED}[ERROR]${NC} Configuration file not found at $CONFIG_FILE"
+    log_error "Configuration file not found at $CONFIG_FILE" "$SCRIPT_NAME"
     exit 1
 fi
 
@@ -28,34 +46,51 @@ echo -e "${BLUE}📤 Push S3-Enhanced Fast API to ECR${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo
 
-# Login to ECR
-echo -e "${GREEN}[STEP 1]${NC} Logging into ECR..."
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $FAST_API_ECR_REPOSITORY_URI
-
-# Verify images exist locally
-echo -e "${GREEN}[STEP 2]${NC} Verifying local images..."
-if ! docker images | grep -q "$FAST_API_ECR_REPOSITORY_URI.*s3-enhanced"; then
-    echo -e "${RED}[ERROR]${NC} S3-enhanced image not found locally"
-    echo "Run ./scripts/step-312-fast-api-build-s3-enhanced-image.sh first"
+# Validate prerequisites
+if ! docker images | grep -q "$FAST_API_ECR_REPOSITORY_URI.*s3-enhanced" 2>/dev/null; then
+    log_error "S3-enhanced image not found locally" "$SCRIPT_NAME"
+    echo -e "${YELLOW}💡 Run: ./scripts/step-312-fast-api-build-s3-enhanced-image.sh${NC}"
     exit 1
 fi
 
+# Login to ECR
+log_info "Logging into ECR..." "$SCRIPT_NAME"
+if ! aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $FAST_API_ECR_REPOSITORY_URI; then
+    log_error "Failed to login to ECR" "$SCRIPT_NAME"
+    exit 1
+fi
+log_success "ECR login successful" "$SCRIPT_NAME"
+
+# Verify images exist locally (already done in prerequisites)
+
 # Push images
-echo -e "${GREEN}[STEP 3]${NC} Pushing images to ECR..."
+log_info "Pushing images to ECR..." "$SCRIPT_NAME"
 
-echo -e "${YELLOW}[INFO]${NC} Pushing s3-enhanced tag..."
-docker push $FAST_API_ECR_REPOSITORY_URI:s3-enhanced
+log_info "Pushing s3-enhanced tag..." "$SCRIPT_NAME"
+if ! docker push $FAST_API_ECR_REPOSITORY_URI:s3-enhanced; then
+    log_error "Failed to push s3-enhanced image" "$SCRIPT_NAME"
+    exit 1
+fi
 
-echo -e "${YELLOW}[INFO]${NC} Pushing latest-s3 tag..."
-docker push $FAST_API_ECR_REPOSITORY_URI:latest-s3
+log_info "Pushing latest-s3 tag..." "$SCRIPT_NAME"
+if ! docker push $FAST_API_ECR_REPOSITORY_URI:latest-s3; then
+    log_error "Failed to push latest-s3 image" "$SCRIPT_NAME"
+    exit 1
+fi
+
+log_success "All images pushed successfully" "$SCRIPT_NAME"
 
 # Verify push succeeded
-echo -e "${GREEN}[STEP 4]${NC} Verifying images in ECR..."
-aws ecr describe-images \
+log_info "Verifying images in ECR..." "$SCRIPT_NAME"
+if aws ecr describe-images \
     --repository-name "$FAST_API_ECR_REPO_NAME" \
     --region "$AWS_REGION" \
     --query 'imageDetails[?contains(imageTags, `s3-enhanced`) || contains(imageTags, `latest-s3`)].[imageTags[0],imagePushedAt,imageSizeInBytes]' \
-    --output table
+    --output table; then
+    log_success "Images verified in ECR" "$SCRIPT_NAME"
+else
+    log_warning "Could not verify images, but push may have succeeded" "$SCRIPT_NAME"
+fi
 
 echo
 echo -e "${BLUE}======================================${NC}"
@@ -91,9 +126,14 @@ echo '  -d '"'"'{"audio_url": "https://example.com/audio.mp3"}'"'"
 echo ""
 echo "3. File upload (original functionality):"
 echo 'curl -X POST -F '"'"'file=@audio.mp3'"'"' http://your-api:8000/transcribe'
-# Load next-step helper and show next step  
-SCRIPT_DIR="$PROJECT_ROOT/scripts"
-if [ -f "$SCRIPT_DIR/next-step-helper.sh" ]; then
-    source "$SCRIPT_DIR/next-step-helper.sh"
-    show_next_step "$0" "$SCRIPT_DIR"
+# Mark step as completed
+create_checkpoint "$SCRIPT_NAME" "completed" "$SCRIPT_NAME"
+log_success "S3-Enhanced images pushed to ECR successfully" "$SCRIPT_NAME"
+
+# Show next step using navigation library
+if declare -f show_next_step > /dev/null 2>&1; then
+    show_next_step "$0" "$(dirname "$0")"
+else
+    echo ""
+    log_info "Next step: Run ./scripts/step-320-fast-api-launch-gpu-instances.sh" "$SCRIPT_NAME"
 fi

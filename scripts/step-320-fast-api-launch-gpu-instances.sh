@@ -1,15 +1,32 @@
 #!/bin/bash
 
 # step-320-fast-api-launch-gpu-instances.sh - Launch GPU instance with Fast API container
+# This script launches a GPU-enabled EC2 instance and runs the Fast API container
+# Prerequisites: step-313 (ECR images pushed)
+# Outputs: Running EC2 instance with Fast API container
 
-set -e
+# Source framework libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/error-handling.sh" ]; then
+    source "$SCRIPT_DIR/error-handling.sh"
+else
+    echo "Error handling library not found, using basic error handling"
+    set -e
+fi
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+if [ -f "$SCRIPT_DIR/step-navigation.sh" ]; then
+    source "$SCRIPT_DIR/step-navigation.sh"
+fi
+
+# Initialize script
+SCRIPT_NAME="step-320-fast-api-launch-gpu-instances"
+setup_error_handling "$SCRIPT_NAME"
+create_checkpoint "$SCRIPT_NAME" "in_progress" "$SCRIPT_NAME"
+
+# Show step purpose
+if declare -f show_step_purpose > /dev/null 2>&1; then
+    show_step_purpose "$0"
+fi
 
 # Load configuration
 CONFIG_FILE=".env"
@@ -277,8 +294,14 @@ echo "    -d '{\"s3_input_path\": \"s3://bucket/audio.mp3\", \"s3_output_path\":
 echo
 echo "File upload:"
 echo "  curl -X POST -F 'file=@audio.mp3' http://$PUBLIC_IP:8000/transcribe"
-# Load next-step helper and show next step
-if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
-    source "$(dirname "$0")/next-step-helper.sh"
+# Mark step as completed
+create_checkpoint "$SCRIPT_NAME" "completed" "$SCRIPT_NAME"
+log_success "Fast API GPU instance launched successfully" "$SCRIPT_NAME"
+
+# Show next step using navigation library
+if declare -f show_next_step > /dev/null 2>&1; then
     show_next_step "$0" "$(dirname "$0")"
+else
+    echo ""
+    log_info "Next step: Run ./scripts/step-326-fast-api-check-gpu-health.sh" "$SCRIPT_NAME"
 fi
