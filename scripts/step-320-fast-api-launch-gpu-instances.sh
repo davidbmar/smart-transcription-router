@@ -226,7 +226,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --subnet-id "$SUBNET_ID" \
     --iam-instance-profile Name="$WORKER_INSTANCE_PROFILE" \
     --user-data "$USER_DATA" \
-    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=fast-api-gpu-worker},{Key=Type,Value=fast-api-worker},{Key=Project,Value=$QUEUE_PREFIX}]" \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=fast-api-gpu-worker},{Key=Type,Value=fast-api-worker},{Key=Project,Value=$QUEUE_PREFIX},{Key=ImageTag,Value=$IMAGE_TAG}]" \
     --metadata-options "HttpTokens=optional,HttpPutResponseHopLimit=2" \
     --region "$AWS_REGION" \
     --query 'Instances[0].InstanceId' \
