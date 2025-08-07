@@ -505,6 +505,31 @@ else
     print_status "IAM configuration updated in .env"
 fi
 
+# Create IAM configuration tracking file
+IAM_CONFIG_FILE=".iam-config"
+cat > "$IAM_CONFIG_FILE" <<EOF
+# IAM Configuration - Created by step-010
+ACCOUNT_ID=$ACCOUNT_ID
+USER_POLICY_NAME=$USER_POLICY_NAME
+WORKER_POLICY_NAME=$WORKER_POLICY_NAME
+WORKER_ROLE_NAME=$WORKER_ROLE_NAME
+INSTANCE_PROFILE_NAME=$INSTANCE_PROFILE_NAME
+CREATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
+
+print_status "Created $IAM_CONFIG_FILE tracking file"
+
+# Update setup status
+SETUP_STATUS_FILE=".setup-status"
+if [ -f "$SETUP_STATUS_FILE" ]; then
+    echo "STEP_010_COMPLETE=$(date)" >> "$SETUP_STATUS_FILE"
+else
+    echo "# Setup Status Tracker" > "$SETUP_STATUS_FILE"
+    echo "STEP_010_COMPLETE=$(date)" >> "$SETUP_STATUS_FILE"
+fi
+
+print_status "Updated setup status - step-010 marked complete"
+
 # Load next-step helper and show next step
 if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
     source "$(dirname "$0")/next-step-helper.sh"

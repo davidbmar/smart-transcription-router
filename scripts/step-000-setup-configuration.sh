@@ -1,31 +1,47 @@
 #!/bin/bash
 
 # step-000-setup-configuration.sh - Interactive configuration setup for transcription system
+# This script sets up initial configuration for the smart transcription router
+# Prerequisites: None (first step)
+# Outputs: .env configuration file, .setup-status tracking
 
-set -e
+# Source framework libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/error-handling.sh" ]; then
+    source "$SCRIPT_DIR/error-handling.sh"
+else
+    echo "Error handling library not found, using basic error handling"
+    set -e
+fi
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+if [ -f "$SCRIPT_DIR/step-navigation.sh" ]; then
+    source "$SCRIPT_DIR/step-navigation.sh"
+fi
 
-# Function to print colored output
+# Initialize script
+SCRIPT_NAME="step-000-setup-configuration"
+setup_error_handling "$SCRIPT_NAME"
+create_checkpoint "$SCRIPT_NAME" "in_progress" "$SCRIPT_NAME"
+
+# Show step purpose
+if declare -f show_step_purpose > /dev/null 2>&1; then
+    show_step_purpose "$0"
+fi
+
+# Function to print header (for backward compatibility)
 print_header() {
     echo ""
     echo -e "${BLUE}=== $1 ===${NC}"
     echo ""
 }
 
+# Alias functions for backward compatibility
 print_status() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    log_info "$1" "$SCRIPT_NAME"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    log_error "$1" "$SCRIPT_NAME"
 }
 
 print_warning() {
@@ -449,18 +465,22 @@ fi
 
 print_header "Setup Complete!"
 
-print_status "Configuration files created:"
+log_success "Configuration files created:" "$SCRIPT_NAME"
 echo "  - $CONFIG_FILE (main configuration)"
 echo "  - $SETUP_STATUS_FILE (setup progress)"
 echo "  - $NEXT_STEPS_FILE (next steps guide)"
 echo ""
-print_status "To use this configuration in other scripts:"
+log_info "To use this configuration in other scripts:" "$SCRIPT_NAME"
 echo -e "${GREEN}  source $CONFIG_FILE${NC}"
-echo ""
-print_status "Next step: Run ${GREEN}./scripts/step-001-validate-configuration.sh${NC}"
 
-# Load next-step helper and show next step
-if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
-    source "$(dirname "$0")/next-step-helper.sh"
+# Mark step as completed
+create_checkpoint "$SCRIPT_NAME" "completed" "$SCRIPT_NAME"
+log_success "Initial configuration completed successfully" "$SCRIPT_NAME"
+
+# Show next step using navigation library
+if declare -f show_next_step > /dev/null 2>&1; then
     show_next_step "$0" "$(dirname "$0")"
+else
+    echo ""
+    log_info "Next step: Run ./scripts/step-001-validate-configuration.sh" "$SCRIPT_NAME"
 fi

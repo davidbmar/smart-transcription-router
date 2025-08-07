@@ -95,7 +95,7 @@ check_status "User can describe launch templates" \
 
 # Check 10: IAM config file exists
 check_status "IAM configuration file exists" \
-    "[ -f iam-config.env ]" \
+    "[ -f .iam-config ]" \
     "Should be created by step-010-setup-iam-permissions.sh"
 
 # Check 11: Setup status updated
