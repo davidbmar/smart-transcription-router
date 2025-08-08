@@ -168,9 +168,12 @@ if [ $VALIDATION_PASSED -eq 1 ]; then
     echo "- Dead Letter Queue: $DLQ_URL"
     echo "- Metrics Bucket: s3://$METRICS_BUCKET"
     echo "- Audio Bucket: s3://$AUDIO_BUCKET"
-    echo
-    echo "Next step: Configure EC2 settings"
-    echo "  ./scripts/step-060-choose-deployment-path.sh"
+    
+    # Load next-step helper and show next step
+    if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
+        source "$(dirname "$0")/next-step-helper.sh"
+        show_next_step "$0" "$(dirname "$0")"
+    fi
 else
     echo -e "${RED}✗ SQS & S3 resources validation FAILED${NC}"
     echo
@@ -181,8 +184,3 @@ fi
 echo -e "${BLUE}======================================${NC}"
 
 exit $((1 - VALIDATION_PASSED))
-# Load next-step helper and show next step
-if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
-    source "$(dirname "$0")/next-step-helper.sh"
-    show_next_step "$0" "$(dirname "$0")"
-fi

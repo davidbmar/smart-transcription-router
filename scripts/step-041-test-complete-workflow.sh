@@ -139,3 +139,9 @@ else
     echo
     echo -e "${GREEN}[INFO]${NC} Job queued successfully. Will be processed when worker starts."
 fi
+
+# Load next-step helper and show next step
+if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
+    source "$(dirname "$0")/next-step-helper.sh"
+    show_next_step "$0" "$(dirname "$0")"
+fi

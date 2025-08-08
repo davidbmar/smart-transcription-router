@@ -200,8 +200,9 @@ if [ -f "${KEY_NAME}.pem" ]; then
 fi
 echo "Updated: .env"
 echo
-echo -e "${BLUE}======================================${NC}"
-echo -e "${GREEN}🎯 NEXT STEP${NC}"
-echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}Run:${NC} ./scripts/step-320-fast-api-launch-gpu-instances.sh"
-echo -e "${BLUE}Purpose:${NC} Launch GPU instance with Fast API container"
+
+# Load next-step helper and show next step
+if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
+    source "$(dirname "$0")/next-step-helper.sh"
+    show_next_step "$0" "$(dirname "$0")"
+fi
