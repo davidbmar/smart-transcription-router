@@ -27,9 +27,133 @@ echo
 
 # Check for EventBridge bus name
 if [ -z "$EVENT_BUS_NAME" ]; then
-    echo -e "${YELLOW}[INPUT REQUIRED]${NC} Enter the EventBridge bus name (e.g., dev-application-events):"
-    read -r EVENT_BUS_NAME
-    echo "EVENT_BUS_NAME=$EVENT_BUS_NAME" >> "$CONFIG_FILE"
+    echo -e "${CYAN}[EVENT BUS CONFIGURATION]${NC}"
+    echo "Choose how to specify the EventBridge bus:"
+    echo "  1) Automatic discovery (recommended)"
+    echo "  2) Manual input"
+    echo -n "Select option [1-2]: "
+    read -r OPTION
+    
+    if [ "$OPTION" = "2" ]; then
+        # Manual input
+        echo -e "${YELLOW}[MANUAL INPUT]${NC}"
+        
+        # List available buses from AWS for reference
+        echo "Available EventBridge buses in AWS:"
+        aws events list-event-buses --query 'EventBuses[?Name!=`default`].Name' --output table 2>/dev/null || echo "  (unable to list)"
+        
+        echo -n "Enter the EventBridge bus name (e.g., dev-application-events): "
+        read -r EVENT_BUS_NAME
+        
+        if [ -z "$EVENT_BUS_NAME" ]; then
+            echo -e "${RED}[ERROR]${NC} Bus name cannot be empty"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}[SELECTED]${NC} Using manually entered bus: $EVENT_BUS_NAME"
+    else
+        # Automatic discovery (default)
+        echo -e "${CYAN}[DISCOVERY]${NC} Starting automatic bus discovery..."
+        
+        DISCOVERED_BUS=""
+        DISCOVERY_SOURCE=""
+        
+        # Method 1: Check eventbridge-orchestrator project (most reliable)
+        if [ -f "../eventbridge-orchestrator/.env" ]; then
+            DISCOVERED_BUS=$(grep "^EVENT_BUS_NAME=" ../eventbridge-orchestrator/.env 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+            if [ -n "$DISCOVERED_BUS" ]; then
+                DISCOVERY_SOURCE="eventbridge-orchestrator project"
+                echo -e "${GREEN}✓${NC} Found in eventbridge-orchestrator: $DISCOVERED_BUS"
+            fi
+        fi
+        
+        # Method 2: Check cognito project
+        if [ -z "$DISCOVERED_BUS" ] && [ -f "../cognito-lambda-s3-webserver-cloudfront/.env" ]; then
+            DISCOVERED_BUS=$(grep "^EVENT_BUS_NAME=" ../cognito-lambda-s3-webserver-cloudfront/.env 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+            if [ -n "$DISCOVERED_BUS" ]; then
+                DISCOVERY_SOURCE="cognito project"
+                echo -e "${GREEN}✓${NC} Found in cognito project: $DISCOVERED_BUS"
+            fi
+        fi
+        
+        # Method 3: Check AWS for single bus or environment pattern
+        if [ -z "$DISCOVERED_BUS" ]; then
+            echo -e "${CYAN}[AWS]${NC} Checking AWS for existing buses..."
+            AVAILABLE_BUSES=$(aws events list-event-buses \
+                --query 'EventBuses[?Name!=`default`].Name' \
+                --output text 2>/dev/null || echo "")
+            
+            if [ -n "$AVAILABLE_BUSES" ]; then
+                BUS_COUNT=$(echo "$AVAILABLE_BUSES" | wc -w)
+                if [ "$BUS_COUNT" -eq 1 ]; then
+                    DISCOVERED_BUS="$AVAILABLE_BUSES"
+                    DISCOVERY_SOURCE="AWS (single custom bus)"
+                    echo -e "${GREEN}✓${NC} Found single custom bus in AWS: $DISCOVERED_BUS"
+                elif [ -n "$ENVIRONMENT" ]; then
+                    # Try to match based on environment
+                    PATTERN_MATCH=$(echo "$AVAILABLE_BUSES" | tr '\t' '\n' | grep -E "^${ENVIRONMENT}-" | head -1)
+                    if [ -n "$PATTERN_MATCH" ]; then
+                        DISCOVERED_BUS="$PATTERN_MATCH"
+                        DISCOVERY_SOURCE="AWS (environment pattern match)"
+                        echo -e "${GREEN}✓${NC} Found pattern match for '$ENVIRONMENT': $DISCOVERED_BUS"
+                    fi
+                fi
+            fi
+        fi
+        
+        # Method 4: Convention-based guess
+        if [ -z "$DISCOVERED_BUS" ] && [ -n "$ENVIRONMENT" ]; then
+            CONVENTION_BUS="${ENVIRONMENT}-application-events"
+            if aws events describe-event-bus --name "$CONVENTION_BUS" &>/dev/null; then
+                DISCOVERED_BUS="$CONVENTION_BUS"
+                DISCOVERY_SOURCE="naming convention"
+                echo -e "${GREEN}✓${NC} Found via convention: $DISCOVERED_BUS"
+            fi
+        fi
+        
+        # Use discovered bus or ask for manual input
+        if [ -n "$DISCOVERED_BUS" ]; then
+            echo
+            echo -e "${GREEN}[DISCOVERED]${NC} Found EventBridge bus: $DISCOVERED_BUS"
+            echo -e "${CYAN}[SOURCE]${NC} Discovery method: $DISCOVERY_SOURCE"
+            echo -n "Use this bus? [Y/n]: "
+            read -r CONFIRM
+            
+            if [ "$CONFIRM" = "n" ] || [ "$CONFIRM" = "N" ]; then
+                echo -n "Enter the EventBridge bus name manually: "
+                read -r EVENT_BUS_NAME
+            else
+                EVENT_BUS_NAME="$DISCOVERED_BUS"
+            fi
+        else
+            echo -e "${YELLOW}[NOT FOUND]${NC} Could not auto-discover EventBridge bus"
+            echo "Available buses in AWS:"
+            aws events list-event-buses --query 'EventBuses[?Name!=`default`].Name' --output table 2>/dev/null || echo "  (unable to list)"
+            echo -n "Enter the EventBridge bus name: "
+            read -r EVENT_BUS_NAME
+        fi
+    fi
+    
+    # Validate and save the bus name
+    if [ -n "$EVENT_BUS_NAME" ]; then
+        # Verify the bus exists in AWS
+        if aws events describe-event-bus --name "$EVENT_BUS_NAME" &>/dev/null; then
+            echo -e "${GREEN}✓${NC} Verified bus exists in AWS"
+        else
+            echo -e "${YELLOW}[WARNING]${NC} Could not verify bus exists in AWS (may be permissions issue)"
+        fi
+        
+        # Update .env file
+        if grep -q "^export EVENT_BUS_NAME=" "$CONFIG_FILE" 2>/dev/null; then
+            sed -i "s/^export EVENT_BUS_NAME=.*/export EVENT_BUS_NAME=\"$EVENT_BUS_NAME\"/" "$CONFIG_FILE"
+        else
+            echo "export EVENT_BUS_NAME=\"$EVENT_BUS_NAME\"" >> "$CONFIG_FILE"
+        fi
+        echo -e "${GREEN}[SAVED]${NC} EVENT_BUS_NAME=$EVENT_BUS_NAME added to .env"
+    else
+        echo -e "${RED}[ERROR]${NC} No EventBridge bus name specified"
+        exit 1
+    fi
 fi
 
 # Verify Lambda function exists
