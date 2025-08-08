@@ -21,12 +21,11 @@ show_next_step() {
     # Get just the filename without path
     local current_filename=$(basename "$current_script")
     
-    # Get all step-xxx scripts in the same series (same hundred)
-    local current_series=$(echo "$current_filename" | grep -o 'step-[0-9]\+' | grep -o '[0-9]\+')
-    local series_prefix="${current_series:0:1}00"  # Get first digit + "00" (e.g., 100, 200, 300)
+    # Get the current script number
+    local current_number=$(echo "$current_filename" | grep -o 'step-[0-9]\+' | grep -o '[0-9]\+')
     
-    # Find all scripts in the same series, sorted
-    local all_scripts=$(ls "$script_dir"/step-${series_prefix:0:1}*.sh 2>/dev/null | sort)
+    # Find all step scripts, sorted numerically
+    local all_scripts=$(ls "$script_dir"/step-*.sh 2>/dev/null | sort -V)
     
     # Find the current script position
     local found_current=false
@@ -69,11 +68,14 @@ show_next_step() {
             echo -e "${CYAN}Purpose:${NC} $description"
         fi
     else
-        # Check if we're at the end of this series
-        echo "   ✅ Series complete! Check other deployment paths:"
-        echo "   📊 PATH 100 (DLAMI): step-100-=-=-=-=-=DLAMI-ONDEMAND-TURNKEY=-=-=--=-=-.sh"
-        echo "   💰 PATH 200 (Ubuntu+Spot): step-200-=-=-=-=-=UBUNTU-MANUAL-SPOT=-=-=--=-=-.sh"  
-        echo "   🐳 PATH 300 (Docker+Spot): step-300-=-=-=-=-=UBUNTU-DOCKER-SPOT=-=-=--=-=-.sh"
+        # Check if we're at a series boundary or end of scripts
+        local series_300_start=$(ls "$script_dir"/step-3*.sh 2>/dev/null | head -1)
+        if [ -n "$current_number" ] && [ "$current_number" -lt "300" ] && [ -n "$series_300_start" ]; then
+            echo "   ✅ Initial setup complete! Continue with Fast API deployment:"
+            echo -e "   ${BLUE}Run:${NC} ./scripts/$(basename "$series_300_start")"
+        else
+            echo "   ✅ All steps complete! Your transcription system is ready."
+        fi
     fi
     echo ""
 }
