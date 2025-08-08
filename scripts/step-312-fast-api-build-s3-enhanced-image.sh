@@ -26,9 +26,18 @@ fi
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}🎤 Build S3-Enhanced Fast API Image${NC}"
 echo -e "${BLUE}======================================${NC}"
+
+# Explain our Docker versioning best practices
+source "$(dirname "$0")/common-functions.sh"
+explain_versioning_strategy
+
+echo -e "${GREEN}[VERSIONING STRATEGY]${NC} This script will:"
+echo "  • Generate unique timestamp-based tag (YYYY.MM.DD.HHMM-s3)"
+echo "  • Check ECR for conflicts and resolve automatically"
+echo "  • Update .env with the new version tag for deployment"
+echo "  • Never rely on 'latest' tag for production reliability"
 echo
-echo -e "${GREEN}[INFO]${NC} This builds the Fast API image with S3 support"
-echo -e "${GREEN}[INFO]${NC} New features:"
+echo -e "${GREEN}[S3-ENHANCED FEATURES]${NC} This image includes:"
 echo "  • Direct S3 input/output support"
 echo "  • URL-based transcription"
 echo "  • Backward compatible with file uploads"
@@ -40,27 +49,15 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Generate timestamp-based version tag
-TIMESTAMP=$(date +"%Y.%m.%d.%H%M")
-VERSION_TAG="${TIMESTAMP}-s3"
+# Generate timestamp-based version tag using best practices
+echo -e "${GREEN}[STEP 1]${NC} Generating date-based version tag..."
+echo -e "${CYAN}[WHY]${NC} Date-based tags ensure immutable, traceable deployments"
 
-echo -e "${GREEN}[STEP 1]${NC} Generating version tag..."
-echo "New version tag: $VERSION_TAG"
+VERSION_TAG=$(generate_version_tag "s3" "$FAST_API_ECR_REPO_NAME" "$AWS_REGION")
 
-# Check if this tag already exists in ECR to avoid conflicts
-echo -e "${GREEN}[STEP 2]${NC} Checking ECR for existing tags..."
-EXISTING_TAGS=$(aws ecr describe-images \
-    --repository-name "$FAST_API_ECR_REPO_NAME" \
-    --region "$AWS_REGION" \
-    --query 'imageDetails[*].imageTags[*]' \
-    --output text 2>/dev/null | tr '\t' '\n' | sort -rV | head -10)
-
-if echo "$EXISTING_TAGS" | grep -q "^$VERSION_TAG$"; then
-    echo -e "${YELLOW}[WARNING]${NC} Tag $VERSION_TAG already exists, adding suffix..."
-    VERSION_TAG="${TIMESTAMP}-s3-$(date +%s | tail -c 3)"
-fi
-
-echo "Using version tag: $VERSION_TAG"
+echo -e "${GREEN}[STEP 2]${NC} Version conflict resolution complete"
+echo -e "${CYAN}[RESULT]${NC} Using version tag: $VERSION_TAG"
+echo -e "${CYAN}[BENEFIT]${NC} This tag is unique, sortable, and traceable to build time"
 
 # Change to Fast API directory
 cd /home/ubuntu/transcription-sqs-spot-s3/docker/fast-api
@@ -87,20 +84,16 @@ fi
 echo -e "\n${GREEN}[STEP 4]${NC} Image details:"
 docker images | grep -E "fast-api-gpu|$FAST_API_ECR_REPO_NAME" | head -5
 
-# Update .env file with new image tag
-echo -e "\n${GREEN}[STEP 5]${NC} Updating .env with new image tag..."
-if [ -f ".env" ]; then
-    # Update FAST_API_DOCKER_IMAGE_TAG in .env file
-    if grep -q "FAST_API_DOCKER_IMAGE_TAG=" .env; then
-        sed -i "s/FAST_API_DOCKER_IMAGE_TAG=.*/FAST_API_DOCKER_IMAGE_TAG=\"$VERSION_TAG\"/" .env
-    else
-        echo "export FAST_API_DOCKER_IMAGE_TAG=\"$VERSION_TAG\"" >> .env
-    fi
-    echo "Updated FAST_API_DOCKER_IMAGE_TAG=$VERSION_TAG in .env"
-else
-    echo -e "${RED}[ERROR]${NC} .env file not found!"
+# Update .env file with new image tag using best practices
+echo -e "\n${GREEN}[STEP 5]${NC} Updating .env configuration with versioned tag..."
+echo -e "${CYAN}[WHY]${NC} Pinning exact versions in .env ensures consistent deployments"
+echo -e "${CYAN}[BEST PRACTICE]${NC} All downstream scripts will use this pinned version"
+
+if ! update_env_image_tag "FAST_API_DOCKER_IMAGE_TAG" "$VERSION_TAG"; then
     exit 1
 fi
+
+echo -e "${CYAN}[RESULT]${NC} Future deployments will use pinned version: $VERSION_TAG"
 
 echo
 echo -e "${BLUE}======================================${NC}"

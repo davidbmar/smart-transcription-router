@@ -44,6 +44,17 @@ fi
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}📤 Push S3-Enhanced Fast API to ECR${NC}"
 echo -e "${BLUE}======================================${NC}"
+
+echo -e "${GREEN}[VERSIONING STRATEGY]${NC} This script demonstrates best practices:"
+echo "  • Reads pinned version from .env (set by step-312)"
+echo "  • Pushes exact versioned tag to ECR"
+echo "  • Creates 'stable-s3' alias for tested versions"
+echo "  • NEVER relies on floating 'latest' tags"
+echo
+echo -e "${CYAN}[WHY THIS MATTERS]${NC}"
+echo "  • Pinned versions ensure reproducible deployments"
+echo "  • Date-based tags make rollbacks traceable"
+echo "  • Eliminates 'works on my machine' deployment issues"
 echo
 
 # Validate prerequisites
@@ -66,29 +77,40 @@ log_success "ECR login successful" "$SCRIPT_NAME"
 # Push images
 log_info "Pushing images to ECR..." "$SCRIPT_NAME"
 
-# Get the configured image tag
+# Read the pinned version from .env (best practice)
+log_info "Reading pinned image version from .env..." "$SCRIPT_NAME"
 IMAGE_TAG="$FAST_API_DOCKER_IMAGE_TAG"
+
 if [ -z "$IMAGE_TAG" ]; then
     log_error "No FAST_API_DOCKER_IMAGE_TAG configured in .env file" "$SCRIPT_NAME"
-    log_error "Run step-312-fast-api-build-s3-enhanced-image.sh first to build a properly tagged image" "$SCRIPT_NAME"
+    echo -e "${YELLOW}[REQUIRED]${NC} Run step-312 first to build and pin a version:"
+    echo "  ./scripts/step-312-fast-api-build-s3-enhanced-image.sh"
+    echo -e "${CYAN}[WHY]${NC} We never deploy without an explicit version pin"
     exit 1
 fi
 
+echo -e "${CYAN}[PINNED VERSION]${NC} Using version from .env: $IMAGE_TAG"
+echo -e "${CYAN}[BEST PRACTICE]${NC} This ensures consistent deployments across environments"
 log_info "Pushing versioned image with tag: $IMAGE_TAG" "$SCRIPT_NAME"
 if ! docker push $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG; then
     log_error "Failed to push image with tag $IMAGE_TAG" "$SCRIPT_NAME"
     exit 1
 fi
 
-# Create a 'stable-s3' tag (not 'latest') for production deployments
-log_info "Creating stable-s3 alias for production use..." "$SCRIPT_NAME"
+# Create a 'stable-s3' alias (avoiding 'latest' anti-pattern)
+echo -e "${CYAN}[CREATING ALIAS]${NC} stable-s3 -> $IMAGE_TAG"
+echo -e "${CYAN}[WHEN TO USE]${NC} stable-s3 alias for tested versions in development"
+echo -e "${CYAN}[PRODUCTION]${NC} Always use exact version tags: $IMAGE_TAG"
+log_info "Creating stable-s3 alias..." "$SCRIPT_NAME"
+
 if ! docker tag $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG $FAST_API_ECR_REPOSITORY_URI:stable-s3; then
     log_warning "Failed to tag as stable-s3, continuing..." "$SCRIPT_NAME"
 else
     if ! docker push $FAST_API_ECR_REPOSITORY_URI:stable-s3; then
         log_warning "Failed to push stable-s3 alias, continuing..." "$SCRIPT_NAME"
     else
-        log_success "Also tagged as stable-s3 for production use" "$SCRIPT_NAME"
+        log_success "Alias created: stable-s3 points to $IMAGE_TAG" "$SCRIPT_NAME"
+        echo -e "${YELLOW}[REMEMBER]${NC} Use specific version tags in production!"
     fi
 fi
 
@@ -111,41 +133,23 @@ echo -e "${BLUE}======================================${NC}"
 echo -e "${GREEN}✅ S3-Enhanced Images Pushed to ECR${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo
-echo -e "${GREEN}[AVAILABLE TAGS]${NC}"
-echo "• s3-enhanced - Main S3-enabled version"
-echo "• latest-s3 - Alias for s3-enhanced"
-echo "• fixed - Previous NumPy fix (no S3)"
-echo "• latest - Original version"
+echo -e "${GREEN}[PUSHED TAGS]${NC}"
+echo "• $IMAGE_TAG - Specific version (PINNED in .env)"
+echo "• stable-s3 - Alias pointing to $IMAGE_TAG"
 echo
-echo -e "${GREEN}[DEPLOYMENT OPTIONS]${NC}"
-echo "1. Deploy new instance with S3 support:"
-echo "   ./scripts/step-300-fast-api-smart-deploy.sh --tag=s3-enhanced"
+echo -e "${CYAN}[DEPLOYMENT STRATEGY]${NC}"
+echo "✅ Production: Use exact version from .env: $IMAGE_TAG"
+echo "⚠️  Development: Can use stable-s3 alias for testing"
+echo "❌ Never: Use 'latest' tag in any environment"
 echo
-echo "2. Update existing instance (manual):"
-echo "   ssh into instance and pull new image"
-echo
-echo -e "${GREEN}[S3 API USAGE - 3 Endpoints Available]${NC}"
-echo ""
-echo "1. S3 to S3 transcription (s3:// URIs):"
-echo 'curl -X POST http://your-api:8000/transcribe-s3 \'
-echo '  -H "Content-Type: application/json" \'
-echo '  -d '"'"'{"s3_input_path": "s3://bucket/audio.mp3",
-       "s3_output_path": "s3://bucket/transcript.json",
-       "return_text": false}'"'"
-echo ""
-echo "2. URL transcription (http/https URLs):"
-echo 'curl -X POST http://your-api:8000/transcribe-url \'
-echo '  -H "Content-Type: application/json" \'
-echo '  -d '"'"'{"audio_url": "https://example.com/audio.mp3"}'"'"
-echo ""
-echo "3. File upload (original functionality):"
-echo 'curl -X POST -F '"'"'file=@audio.mp3'"'"' http://your-api:8000/transcribe'
-# Mark step as completed
-create_checkpoint "$SCRIPT_NAME" "completed" "$SCRIPT_NAME"
-log_success "S3-Enhanced images pushed to ECR successfully" "$SCRIPT_NAME"
-
-# Show next step using navigation library
-if declare -f show_next_step > /dev/null 2>&1; then
+echo -e "${GREEN}[HOW TO FIND LATEST VERSION (if needed)]${NC}"
+echo "📖 For reference only - always pin specific versions:"
+echo "   find_latest_image_version \"$FAST_API_ECR_REPO_NAME\" \"$AWS_REGION\" \"-s3\""
+echo "   # Copy the returned version to .env file"
+echo "   # Never deploy with floating tags"
+# Load next-step helper and show next step
+if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
+    source "$(dirname "$0")/next-step-helper.sh"
     show_next_step "$0" "$(dirname "$0")"
 else
     echo ""

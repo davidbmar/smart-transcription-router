@@ -157,6 +157,73 @@ update_env_image_tag() {
     fi
 }
 
+# Find the latest version tag in ECR (when absolutely necessary)
+# BEST PRACTICE: Only use this for discovery - always pin to specific versions in deployment
+find_latest_image_version() {
+    local repo_name="$1"   # ECR repository name
+    local region="$2"      # AWS region
+    local tag_pattern="$3" # Optional: filter pattern (e.g., "-s3")
+    
+    print_note "🔍 SEARCHING FOR LATEST VERSION (for reference only)"
+    print_warning "Best Practice: Always pin to specific versions in production"
+    print_warning "This function is for discovery only - never deploy with 'latest'"
+    
+    if [ -z "$repo_name" ] || [ -z "$region" ]; then
+        print_error "Repository name and region required"
+        return 1
+    fi
+    
+    local query='imageDetails[*].imageTags[*]'
+    local latest_tag=""
+    
+    # Get all tags, filter by pattern if provided, sort by version
+    local all_tags=$(aws ecr describe-images \
+        --repository-name "$repo_name" \
+        --region "$region" \
+        --query "$query" \
+        --output text 2>/dev/null | tr '\t' '\n')
+    
+    if [ -n "$tag_pattern" ]; then
+        latest_tag=$(echo "$all_tags" | grep "$tag_pattern" | sort -rV | head -1)
+    else
+        latest_tag=$(echo "$all_tags" | sort -rV | head -1)
+    fi
+    
+    if [ -n "$latest_tag" ]; then
+        print_status "Latest version found: $latest_tag"
+        echo "$latest_tag"
+    else
+        print_warning "No versions found matching pattern: $tag_pattern"
+        return 1
+    fi
+}
+
+# Explain Docker versioning best practices
+explain_versioning_strategy() {
+    echo
+    print_header "🏷️  DOCKER IMAGE VERSIONING BEST PRACTICES"
+    echo
+    print_note "📅 DATE-BASED VERSIONING (What we use):"
+    echo "  • Format: YYYY.MM.DD.HHMM-suffix (e.g., 2025.08.08.1430-s3)"
+    echo "  • Immutable - each build gets unique timestamp"
+    echo "  • Sortable chronologically"
+    echo "  • Traceable to exact build time"
+    echo
+    print_note "🎯 PINNING STRATEGY (Recommended):"
+    echo "  • Production: Always use specific date-based tags"
+    echo "  • Development: Can use 'stable-*' aliases that point to tested versions"
+    echo "  • Never use 'latest' in production deployments"
+    echo
+    print_note "🔍 LATEST VERSION DISCOVERY (When needed):"
+    echo "  • Use find_latest_image_version() for reference only"
+    echo "  • Copy the specific version tag for pinning"
+    echo "  • Update .env with the pinned version"
+    echo
+    print_warning "❌ AVOID: Floating tags like 'latest', 'stable' in production"
+    print_success "✅ USE: Specific version tags for reliable deployments"
+    echo
+}
+
 # Progress indicator
 show_progress() {
     local current="$1"
