@@ -98,6 +98,65 @@ check_prerequisites() {
     fi
 }
 
+# Generate timestamp-based version tag with collision detection
+generate_version_tag() {
+    local prefix="$1"      # e.g., "s3", "gpu", "worker"
+    local repo_name="$2"   # ECR repository name
+    local region="$3"      # AWS region
+    
+    local timestamp=$(date +"%Y.%m.%d.%H%M")
+    local version_tag="${timestamp}"
+    
+    # Add prefix if provided
+    if [ -n "$prefix" ]; then
+        version_tag="${timestamp}-${prefix}"
+    fi
+    
+    # Check if tag exists in ECR to avoid conflicts
+    if [ -n "$repo_name" ] && [ -n "$region" ]; then
+        local existing_tags=$(aws ecr describe-images \
+            --repository-name "$repo_name" \
+            --region "$region" \
+            --query 'imageDetails[*].imageTags[*]' \
+            --output text 2>/dev/null | tr '\t' '\n' | sort -rV)
+        
+        if echo "$existing_tags" | grep -q "^$version_tag$"; then
+            # Add timestamp suffix for uniqueness
+            version_tag="${version_tag}-$(date +%s | tail -c 3)"
+        fi
+    fi
+    
+    echo "$version_tag"
+}
+
+# Update .env file with new image tag
+update_env_image_tag() {
+    local var_name="$1"    # e.g., "FAST_API_DOCKER_IMAGE_TAG"
+    local tag_value="$2"   # e.g., "2025.08.08.1430-s3"
+    local env_file="${3:-.env}"  # Default to .env
+    
+    if [ -f "$env_file" ]; then
+        if grep -q "${var_name}=" "$env_file"; then
+            # Update existing variable
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                # macOS sed requires -i ''
+                sed -i '' "s/${var_name}=.*/${var_name}=\"$tag_value\"/" "$env_file"
+            else
+                # Linux sed
+                sed -i "s/${var_name}=.*/${var_name}=\"$tag_value\"/" "$env_file"
+            fi
+        else
+            # Add new variable
+            echo "export ${var_name}=\"$tag_value\"" >> "$env_file"
+        fi
+        print_success "Updated $var_name=$tag_value in $env_file"
+        return 0
+    else
+        print_error "$env_file file not found!"
+        return 1
+    fi
+}
+
 # Progress indicator
 show_progress() {
     local current="$1"

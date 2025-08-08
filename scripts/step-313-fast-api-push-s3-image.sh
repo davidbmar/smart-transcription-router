@@ -69,25 +69,26 @@ log_info "Pushing images to ECR..." "$SCRIPT_NAME"
 # Get the configured image tag
 IMAGE_TAG="$FAST_API_DOCKER_IMAGE_TAG"
 if [ -z "$IMAGE_TAG" ]; then
-    IMAGE_TAG="latest-s3"
-    log_warning "No FAST_API_DOCKER_IMAGE_TAG configured, using default: $IMAGE_TAG" "$SCRIPT_NAME"
+    log_error "No FAST_API_DOCKER_IMAGE_TAG configured in .env file" "$SCRIPT_NAME"
+    log_error "Run step-312-fast-api-build-s3-enhanced-image.sh first to build a properly tagged image" "$SCRIPT_NAME"
+    exit 1
 fi
 
-log_info "Pushing image with tag: $IMAGE_TAG" "$SCRIPT_NAME"
+log_info "Pushing versioned image with tag: $IMAGE_TAG" "$SCRIPT_NAME"
 if ! docker push $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG; then
     log_error "Failed to push image with tag $IMAGE_TAG" "$SCRIPT_NAME"
     exit 1
 fi
 
-# Also push as latest-s3 for backward compatibility
-log_info "Pushing latest-s3 alias..." "$SCRIPT_NAME"
-if ! docker tag $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG $FAST_API_ECR_REPOSITORY_URI:latest-s3; then
-    log_warning "Failed to tag as latest-s3, continuing..." "$SCRIPT_NAME"
+# Create a 'stable-s3' tag (not 'latest') for production deployments
+log_info "Creating stable-s3 alias for production use..." "$SCRIPT_NAME"
+if ! docker tag $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG $FAST_API_ECR_REPOSITORY_URI:stable-s3; then
+    log_warning "Failed to tag as stable-s3, continuing..." "$SCRIPT_NAME"
 else
-    if ! docker push $FAST_API_ECR_REPOSITORY_URI:latest-s3; then
-        log_warning "Failed to push latest-s3 alias, continuing..." "$SCRIPT_NAME"
+    if ! docker push $FAST_API_ECR_REPOSITORY_URI:stable-s3; then
+        log_warning "Failed to push stable-s3 alias, continuing..." "$SCRIPT_NAME"
     else
-        log_success "Also tagged as latest-s3" "$SCRIPT_NAME"
+        log_success "Also tagged as stable-s3 for production use" "$SCRIPT_NAME"
     fi
 fi
 
