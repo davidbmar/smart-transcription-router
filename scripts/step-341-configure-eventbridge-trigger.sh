@@ -55,6 +55,24 @@ if [ -z "$EVENT_BUS_NAME" ]; then
         # Automatic discovery (default)
         echo -e "${CYAN}[DISCOVERY]${NC} Starting automatic bus discovery..."
         
+        # First, show what's available in AWS
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}[AWS]${NC} EventBridge buses in your account:"
+        AWS_BUSES=$(aws events list-event-buses --query 'EventBuses[*].Name' --output text 2>/dev/null || echo "")
+        if [ -n "$AWS_BUSES" ]; then
+            for bus in $AWS_BUSES; do
+                if [ "$bus" = "default" ]; then
+                    echo "  • $bus (AWS default - not for custom events)"
+                else
+                    echo -e "  • ${GREEN}$bus${NC} (custom bus)"
+                fi
+            done
+        else
+            echo "  (Unable to list - check AWS permissions)"
+        fi
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo
+        
         DISCOVERED_BUS=""
         DISCOVERY_SOURCE=""
         
@@ -111,11 +129,35 @@ if [ -z "$EVENT_BUS_NAME" ]; then
             fi
         fi
         
+        # Show discovery summary
+        echo
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}[DISCOVERY SUMMARY]${NC}"
+        
+        # Check all sources and display results
+        EB_BUS=$([ -f "../eventbridge-orchestrator/.env" ] && grep "^EVENT_BUS_NAME=" ../eventbridge-orchestrator/.env 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "")
+        COGNITO_BUS=$([ -f "../cognito-lambda-s3-webserver-cloudfront/.env" ] && grep "^EVENT_BUS_NAME=" ../cognito-lambda-s3-webserver-cloudfront/.env 2>/dev/null | cut -d'=' -f2 | tr -d '"' || echo "")
+        CURRENT_BUS=$([ -f ".env" ] && grep "^export EVENT_BUS_NAME=" .env 2>/dev/null | cut -d'"' -f2 || echo "")
+        
+        echo "  EventBridge Orchestrator: ${EB_BUS:-not found}"
+        echo "  Cognito Project:          ${COGNITO_BUS:-not found}"
+        echo "  Current .env:             ${CURRENT_BUS:-not configured}"
+        echo "  AWS Custom Bus:           $(echo "$AWS_BUSES" | tr '\t' '\n' | grep -v default | head -1 || echo "none")"
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        
         # Use discovered bus or ask for manual input
         if [ -n "$DISCOVERED_BUS" ]; then
             echo
-            echo -e "${GREEN}[DISCOVERED]${NC} Found EventBridge bus: $DISCOVERED_BUS"
-            echo -e "${CYAN}[SOURCE]${NC} Discovery method: $DISCOVERY_SOURCE"
+            echo -e "${GREEN}[RECOMMENDED]${NC} Based on discovery: $DISCOVERED_BUS"
+            echo -e "${CYAN}[SOURCE]${NC} $DISCOVERY_SOURCE"
+            
+            # Validate it exists in AWS
+            if echo "$AWS_BUSES" | grep -q "$DISCOVERED_BUS"; then
+                echo -e "${GREEN}✓${NC} Verified: This bus exists in AWS"
+            else
+                echo -e "${YELLOW}⚠${NC} Warning: This bus was not found in AWS listing"
+            fi
+            
             echo -n "Use this bus? [Y/n]: "
             read -r CONFIRM
             
