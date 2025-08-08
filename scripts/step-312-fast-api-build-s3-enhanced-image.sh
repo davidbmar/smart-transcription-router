@@ -49,6 +49,9 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
+# Save project root directory before changing directories
+PROJECT_ROOT="$(pwd)"
+
 # Generate timestamp-based version tag using best practices
 echo -e "${GREEN}[STEP 1]${NC} Generating date-based version tag..."
 echo -e "${CYAN}[WHY]${NC} Date-based tags ensure immutable, traceable deployments"
@@ -88,6 +91,9 @@ docker images | grep -E "fast-api-gpu|$FAST_API_ECR_REPO_NAME" | head -5
 echo -e "\n${GREEN}[STEP 5]${NC} Updating .env configuration with versioned tag..."
 echo -e "${CYAN}[WHY]${NC} Pinning exact versions in .env ensures consistent deployments"
 echo -e "${CYAN}[BEST PRACTICE]${NC} All downstream scripts will use this pinned version"
+
+# Go back to project root to update .env file
+cd "$PROJECT_ROOT"
 
 if ! update_env_image_tag "FAST_API_DOCKER_IMAGE_TAG" "$VERSION_TAG"; then
     exit 1
