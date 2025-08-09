@@ -57,9 +57,16 @@ echo "  • Date-based tags make rollbacks traceable"
 echo "  • Eliminates 'works on my machine' deployment issues"
 echo
 
-# Validate prerequisites
-if ! docker images | grep -q "$FAST_API_ECR_REPOSITORY_URI.*s3-enhanced" 2>/dev/null; then
-    log_error "S3-enhanced image not found locally" "$SCRIPT_NAME"
+# Validate prerequisites - check for the versioned image from .env
+IMAGE_TAG="${FAST_API_DOCKER_IMAGE_TAG}"
+if [ -z "$IMAGE_TAG" ]; then
+    log_error "No FAST_API_DOCKER_IMAGE_TAG configured in .env file" "$SCRIPT_NAME"
+    echo -e "${YELLOW}💡 Run: ./scripts/step-312-fast-api-build-s3-enhanced-image.sh${NC}"
+    exit 1
+fi
+
+if ! docker images | grep -q "$FAST_API_ECR_REPOSITORY_URI.*$IMAGE_TAG" 2>/dev/null; then
+    log_error "S3-enhanced image with tag $IMAGE_TAG not found locally" "$SCRIPT_NAME"
     echo -e "${YELLOW}💡 Run: ./scripts/step-312-fast-api-build-s3-enhanced-image.sh${NC}"
     exit 1
 fi
@@ -77,24 +84,23 @@ log_success "ECR login successful" "$SCRIPT_NAME"
 # Push images
 log_info "Pushing images to ECR..." "$SCRIPT_NAME"
 
-# Read the pinned version from .env (best practice)
-log_info "Reading pinned image version from .env..." "$SCRIPT_NAME"
-IMAGE_TAG="$FAST_API_DOCKER_IMAGE_TAG"
-
-if [ -z "$IMAGE_TAG" ]; then
-    log_error "No FAST_API_DOCKER_IMAGE_TAG configured in .env file" "$SCRIPT_NAME"
-    echo -e "${YELLOW}[REQUIRED]${NC} Run step-312 first to build and pin a version:"
-    echo "  ./scripts/step-312-fast-api-build-s3-enhanced-image.sh"
-    echo -e "${CYAN}[WHY]${NC} We never deploy without an explicit version pin"
-    exit 1
-fi
-
 echo -e "${CYAN}[PINNED VERSION]${NC} Using version from .env: $IMAGE_TAG"
 echo -e "${CYAN}[BEST PRACTICE]${NC} This ensures consistent deployments across environments"
-log_info "Pushing versioned image with tag: $IMAGE_TAG" "$SCRIPT_NAME"
-if ! docker push $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG; then
-    log_error "Failed to push image with tag $IMAGE_TAG" "$SCRIPT_NAME"
-    exit 1
+echo -e "${YELLOW}[NOTE]${NC} This is a large image (~10GB) and may take 3-5 minutes to push"
+log_info "Pushing versioned image with tag: $IMAGE_TAG (this may take several minutes)..." "$SCRIPT_NAME"
+
+# Use timeout to handle large image pushes (5 minutes should be enough)
+if ! timeout 300 docker push $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG; then
+    # Check if the image actually made it to ECR despite timeout
+    if aws ecr describe-images --repository-name $(basename $FAST_API_ECR_REPOSITORY_URI) \
+           --region $AWS_REGION --image-ids imageTag=$IMAGE_TAG &>/dev/null; then
+        log_success "Image push completed (verified in ECR)" "$SCRIPT_NAME"
+    else
+        log_error "Failed to push image with tag $IMAGE_TAG" "$SCRIPT_NAME"
+        exit 1
+    fi
+else
+    log_success "Image pushed successfully: $IMAGE_TAG" "$SCRIPT_NAME"
 fi
 
 # Create a 'stable-s3' alias (avoiding 'latest' anti-pattern)
@@ -106,8 +112,14 @@ log_info "Creating stable-s3 alias..." "$SCRIPT_NAME"
 if ! docker tag $FAST_API_ECR_REPOSITORY_URI:$IMAGE_TAG $FAST_API_ECR_REPOSITORY_URI:stable-s3; then
     log_warning "Failed to tag as stable-s3, continuing..." "$SCRIPT_NAME"
 else
-    if ! docker push $FAST_API_ECR_REPOSITORY_URI:stable-s3; then
-        log_warning "Failed to push stable-s3 alias, continuing..." "$SCRIPT_NAME"
+    if ! timeout 60 docker push $FAST_API_ECR_REPOSITORY_URI:stable-s3; then
+        # Check if it made it despite timeout
+        if aws ecr describe-images --repository-name $(basename $FAST_API_ECR_REPOSITORY_URI) \
+               --region $AWS_REGION --image-ids imageTag=stable-s3 &>/dev/null; then
+            log_success "Alias created: stable-s3 points to $IMAGE_TAG" "$SCRIPT_NAME"
+        else
+            log_warning "Failed to push stable-s3 alias, continuing..." "$SCRIPT_NAME"
+        fi
     else
         log_success "Alias created: stable-s3 points to $IMAGE_TAG" "$SCRIPT_NAME"
         echo -e "${YELLOW}[REMEMBER]${NC} Use specific version tags in production!"
