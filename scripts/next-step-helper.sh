@@ -24,19 +24,34 @@ show_next_step() {
     # Get the current script number
     local current_number=$(echo "$current_filename" | grep -o 'step-[0-9]\+' | grep -o '[0-9]\+')
     
-    # Find all step scripts, sorted numerically
-    local all_scripts=$(ls "$script_dir"/step-*.sh 2>/dev/null | sort -V)
+    # Find all step scripts, sorted numerically by step number
+    # Use find to get full paths, then sort by numerical step number
+    local all_scripts_raw=$(find "$script_dir" -name "step-*.sh" -type f 2>/dev/null)
+    
+    # Sort by extracting step number and sorting numerically
+    local all_scripts=""
+    while IFS= read -r script; do
+        if [[ -n "$script" ]]; then
+            all_scripts="$all_scripts$script"$'\n'
+        fi
+    done < <(echo "$all_scripts_raw" | sort -t'-' -k2 -n)
+    
+    # Remove the last newline
+    all_scripts=$(echo "$all_scripts" | sed '$d')
     
     # Find the current script position
     local found_current=false
     local next_script=""
     
-    for script in $all_scripts; do
+    # Convert to array for easier iteration
+    while IFS= read -r script; do
+        if [[ -z "$script" ]]; then continue; fi
+        
         local script_name=$(basename "$script")
         
         if [ "$found_current" = true ]; then
-            # Skip divider files (contain "=-=-=-=-=")
-            if [[ "$script_name" != *"=-=-=-=-="* ]]; then
+            # Skip divider files (contain "=-=-=-=-=") and step-navigation.sh
+            if [[ "$script_name" != *"=-=-=-=-="* ]] && [[ "$script_name" != "step-navigation.sh" ]]; then
                 next_script="$script"
                 break
             fi
@@ -45,7 +60,7 @@ show_next_step() {
         if [ "$script_name" = "$current_filename" ]; then
             found_current=true
         fi
-    done
+    done <<< "$all_scripts"
     
     echo ""
     echo -e "${GREEN}======================================${NC}"
