@@ -79,12 +79,12 @@ def send_to_fastapi(server_url, event_data):
                 session_id = parts[4]  # .../sessions/{sessionId}/...
                 chunk_name = parts[-1].replace('.webm', '')  # chunk-001.webm -> chunk-001
         
-        # Build proper output path under user's transcriptions directory
+        # Build proper output path under user's transcripts directory (note: transcripts not transcriptions)
         if user_id and session_id and chunk_name:
-            output_path = f"s3://{s3_bucket}/users/{user_id}/transcriptions/{session_id}-{chunk_name}.json"
+            output_path = f"s3://{s3_bucket}/users/{user_id}/transcripts/{session_id}-{chunk_name}.json"
         else:
             # Fallback to original logic if parsing fails
-            output_path = f"s3://{s3_bucket}/transcriptions/{s3_key}.json"
+            output_path = f"s3://{s3_bucket}/transcripts/{s3_key}.json"
             print(f"Warning: Could not parse user structure from key {s3_key}, using fallback path")
         
         # Prepare request for FastAPI
