@@ -61,6 +61,7 @@ def check_session_completion(s3_bucket, user_id, session_id):
     try:
         print(f"Checking completion for session {session_id} in bucket {s3_bucket}")
         # First, get session metadata to see expected chunk count
+        # The session_id already includes the date prefix (e.g., "2025-08-10-session-1754804345487-fjkwnf")
         metadata_key = f"users/{user_id}/audio/sessions/{session_id}/metadata.json"
         
         try:
