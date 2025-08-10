@@ -3,10 +3,13 @@ import os
 import boto3
 import requests
 from datetime import datetime
+import subprocess
+import tempfile
 
 # Initialize AWS clients
 sqs = boto3.client('sqs')
 ec2 = boto3.client('ec2')
+s3 = boto3.client('s3')
 
 # Environment variables
 SQS_QUEUE_URL = os.environ.get('SQS_QUEUE_URL')
@@ -49,6 +52,198 @@ def check_server_health(server_url):
         )
         return response.status_code == 200
     except:
+        return False
+
+def check_session_completion(s3_bucket, user_id, session_id):
+    """Check if a session is complete and trigger combination if needed"""
+    try:
+        # First, get session metadata to see expected chunk count
+        metadata_key = f"users/{user_id}/audio/sessions/{session_id}/metadata.json"
+        
+        try:
+            metadata_response = s3.get_object(Bucket=s3_bucket, Key=metadata_key)
+            metadata = json.loads(metadata_response['Body'].read().decode('utf-8'))
+            expected_chunks = metadata.get('chunkCount', 0)
+            
+            if expected_chunks == 0:
+                print(f"Session {session_id} has no expected chunk count, skipping completion check")
+                return False
+        except s3.exceptions.NoSuchKey:
+            print(f"No metadata found for session {session_id}, cannot determine completion")
+            return False
+        
+        # Count existing transcripts for this session
+        transcript_prefix = f"users/{user_id}/transcripts/{session_id}-chunk-"
+        
+        response = s3.list_objects_v2(Bucket=s3_bucket, Prefix=transcript_prefix)
+        existing_transcripts = len(response.get('Contents', []))
+        
+        print(f"Session {session_id}: {existing_transcripts}/{expected_chunks} chunks transcribed")
+        
+        # If we have all expected chunks, check if session transcript exists
+        if existing_transcripts >= expected_chunks:
+            session_transcript_key = f"users/{user_id}/transcripts/{session_id}.json"
+            
+            try:
+                s3.head_object(Bucket=s3_bucket, Key=session_transcript_key)
+                print(f"Session transcript already exists for {session_id}")
+                return False
+            except s3.exceptions.NoSuchKey:
+                print(f"Session {session_id} is complete, triggering combination")
+                return trigger_session_combination(s3_bucket, user_id, session_id)
+        
+        return False
+        
+    except Exception as e:
+        print(f"Error checking session completion: {e}")
+        return False
+
+def trigger_session_combination(s3_bucket, user_id, session_id):
+    """Trigger session transcript combination"""
+    try:
+        # Download the combiner script from our repository or use inline Python
+        # For now, implement the combination logic inline
+        
+        # Find all chunk transcripts
+        prefixes = [
+            f"users/{user_id}/transcripts/{session_id}-chunk-",
+            f"users/{user_id}/transcriptions/{session_id}-chunk-"
+        ]
+        
+        chunk_files = []
+        
+        for prefix in prefixes:
+            try:
+                response = s3.list_objects_v2(Bucket=s3_bucket, Prefix=prefix)
+                if 'Contents' in response:
+                    for obj in response['Contents']:
+                        key = obj['Key']
+                        # Extract chunk number from filename
+                        import re
+                        match = re.search(r'chunk-(\d+)\.json$', key)
+                        if match:
+                            chunk_num = int(match.group(1))
+                            chunk_files.append({
+                                'key': key,
+                                'chunk_number': chunk_num
+                            })
+            except Exception as e:
+                print(f"Error listing chunk files with prefix {prefix}: {e}")
+        
+        # Sort by chunk number
+        chunk_files.sort(key=lambda x: x['chunk_number'])
+        
+        if not chunk_files:
+            print(f"No chunk transcripts found for session {session_id}")
+            return False
+        
+        print(f"Found {len(chunk_files)} chunk transcripts, combining...")
+        
+        # Download all chunk transcripts
+        chunk_transcripts = []
+        for chunk_file in chunk_files:
+            try:
+                response = s3.get_object(Bucket=s3_bucket, Key=chunk_file['key'])
+                content = response['Body'].read().decode('utf-8')
+                transcript = json.loads(content)
+                chunk_transcripts.append(transcript)
+            except Exception as e:
+                print(f"Error downloading {chunk_file['key']}: {e}")
+        
+        if not chunk_transcripts:
+            print("No valid transcripts to combine")
+            return False
+        
+        # Combine transcripts (simplified version)
+        combined = {
+            'text': '',
+            'chunks': [],
+            'paragraphs': [],
+            'metadata': {
+                'total_chunks': len(chunk_transcripts),
+                'duration': 0,
+                'wordCount': 0
+            }
+        }
+        
+        current_time_offset = 0.0
+        
+        for i, transcript in enumerate(chunk_transcripts):
+            if not transcript or 'chunks' not in transcript:
+                continue
+            
+            # Add to combined text
+            chunk_text = transcript.get('text', '').strip()
+            if chunk_text:
+                if combined['text']:
+                    combined['text'] += ' ' + chunk_text
+                else:
+                    combined['text'] = chunk_text
+            
+            # Process chunks with time offset
+            for chunk in transcript['chunks']:
+                if 'timestamp' in chunk and len(chunk['timestamp']) == 2:
+                    start_time = current_time_offset + chunk['timestamp'][0]
+                    end_time = current_time_offset + chunk['timestamp'][1]
+                    
+                    combined['chunks'].append({
+                        'timestamp': [start_time, end_time],
+                        'text': chunk['text']
+                    })
+                    
+                    # Create paragraph format
+                    words = chunk['text'].split()
+                    word_objects = []
+                    
+                    chunk_duration = end_time - start_time
+                    if len(words) > 0:
+                        time_per_word = chunk_duration / len(words)
+                        for j, word in enumerate(words):
+                            word_time = start_time + (j * time_per_word)
+                            word_objects.append({
+                                'w': word,
+                                't': word_time
+                            })
+                    
+                    combined['paragraphs'].append({
+                        'speaker': 'Speaker',
+                        'start': start_time,
+                        'end': end_time,
+                        'text': chunk['text'],
+                        'words': word_objects
+                    })
+            
+            # Update time offset (assume 5 seconds per chunk)
+            chunk_duration = 5.0
+            if transcript.get('chunks'):
+                last_chunk = transcript['chunks'][-1]
+                if 'timestamp' in last_chunk and len(last_chunk['timestamp']) == 2:
+                    chunk_duration = last_chunk['timestamp'][1]
+            
+            current_time_offset += chunk_duration
+        
+        # Update metadata
+        combined['metadata']['duration'] = current_time_offset
+        combined['metadata']['wordCount'] = len(combined['text'].split())
+        combined['device'] = chunk_transcripts[0].get('device', 'unknown')
+        combined['model'] = chunk_transcripts[0].get('model', 'unknown')
+        combined['timestamp'] = chunk_transcripts[-1].get('timestamp', '')
+        
+        # Save combined transcript
+        session_key = f"users/{user_id}/transcripts/{session_id}.json"
+        
+        s3.put_object(
+            Bucket=s3_bucket,
+            Key=session_key,
+            Body=json.dumps(combined, indent=2),
+            ContentType='application/json'
+        )
+        
+        print(f"✅ Created session transcript: {session_key}")
+        return True
+        
+    except Exception as e:
+        print(f"Error combining session transcripts: {e}")
         return False
 
 def send_to_fastapi(server_url, event_data):
@@ -102,6 +297,11 @@ def send_to_fastapi(server_url, event_data):
         )
         
         if response.status_code == 200:
+            # After successful transcription, check if session is complete
+            if user_id and session_id:
+                print(f"Checking session completion for {session_id}")
+                check_session_completion(s3_bucket, user_id, session_id)
+            
             return {
                 'statusCode': 200,
                 'body': json.dumps({
