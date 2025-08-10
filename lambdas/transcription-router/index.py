@@ -57,6 +57,7 @@ def check_server_health(server_url):
 def check_session_completion(s3_bucket, user_id, session_id):
     """Check if a session is complete and trigger combination if needed"""
     try:
+        print(f"Checking completion for session {session_id} in bucket {s3_bucket}")
         # First, get session metadata to see expected chunk count
         metadata_key = f"users/{user_id}/audio/sessions/{session_id}/metadata.json"
         
@@ -297,10 +298,16 @@ def send_to_fastapi(server_url, event_data):
         )
         
         if response.status_code == 200:
+            print(f"FastAPI transcription successful: {response.status_code}")
+            
             # After successful transcription, check if session is complete
             if user_id and session_id:
-                print(f"Checking session completion for {session_id}")
-                check_session_completion(s3_bucket, user_id, session_id)
+                try:
+                    print(f"Checking session completion for {session_id}")
+                    check_session_completion(s3_bucket, user_id, session_id)
+                except Exception as session_error:
+                    print(f"Error checking session completion: {session_error}")
+                    # Don't fail the main transcription, just log the error
             
             return {
                 'statusCode': 200,
