@@ -5,39 +5,46 @@
 # ═════════════════════════════════════════════════════════════════════════════════════
 # 🎯 WHAT THIS SCRIPT DOES
 # ═════════════════════════════════════════════════════════════════════════════════════
-# This is a smart system orchestrator that ensures your transcription pipeline is fully
-# operational while optimizing costs. Think of it as an intelligent "turn on my 
-# transcription system" button.
+# step-345-orchestrate-transcription-system-startup.sh is a smart system orchestrator 
+# that ensures your transcription pipeline is fully operational. Here's what it does:
 #
-# 🔍 SYSTEM ASSESSMENT (Steps 1-3):
-# • Finds FastAPI server - locates existing EC2 instances tagged as "fast-api-worker"
-# • Manages server state - starts stopped instances or launches new ones if none exist  
-# • Health checks - tests if FastAPI server responds to http://{ip}:8000/health
-# • Queue analysis - counts pending messages in SQS queue
+# 🔍 SYSTEM ASSESSMENT (Steps 1-3)
 #
-# ⚖️  INTELLIGENT DECISION MAKING (Step 4):
+# 1. Finds FastAPI server - locates existing EC2 instances tagged as configured in .env
+# 2. Manages server state - starts stopped instances or launches new ones if none exist
+# 3. Health checks - tests if FastAPI server responds to http://{ip}:{port}/health
+# 4. Queue analysis - counts pending messages in SQS queue
+#
+# ⚖️ INTELLIGENT DECISION MAKING (Step 4)
+#
+# if [ messages_waiting > 0 ] OR [ server_unhealthy ]; then
+#     launch_sqs_worker()  # Expensive GPU worker
+# else
+#     use_direct_mode()    # Cheap, fast processing
+# fi
+#
+# 💰 COST-OPTIMIZED LOGIC
+#
 # • Server healthy + empty queue = Uses direct HTTP calls (cheap, fast)
 # • Server unhealthy OR messages queued = Launches GPU worker (expensive, reliable)
 # • Never launches unnecessary workers = Saves money
 #
-# 📊 COMPREHENSIVE STATUS REPORT (Steps 5-6):
+# 📊 COMPREHENSIVE STATUS REPORT (Steps 5-6)
+#
 # • Verifies Lambda router configuration
-# • Shows component health status  
+# • Shows component health status
 # • Displays processing modes available
 # • Provides testing instructions
 #
 # 🎯 PERFECT FOR:
+#
 # • Morning startup before daily workload
-# • Cron jobs at peak hours (e.g., 0 2 * * * for 2 AM prep)
+# • Cron jobs at peak hours (2 AM prep)
 # • Post-maintenance system verification
 # • Auto-scaling when queue depth increases
 #
-# 💰 COST OPTIMIZATION LOGIC:
-# if [ messages_waiting > 0 ] OR [ server_unhealthy ]; then
-#     launch_sqs_worker()  # Expensive GPU worker only when needed
-# else
-#     use_direct_mode()    # Cheap, fast processing when possible
-# fi
+# Think of it as: A smart "turn on my transcription system" button that only spins up 
+# what you actually need, saving costs while ensuring reliability.
 #
 # Prerequisites: step-340 (Lambda router deployed), step-320 (FastAPI instance capability)
 # Outputs: Complete working transcription system with optimal resource allocation
@@ -81,7 +88,7 @@ echo
 echo -e "\n${GREEN}[STEP 1]${NC} Checking FastAPI server status..."
 
 FAST_API_INSTANCE=$(aws ec2 describe-instances \
-    --filters "Name=tag:Type,Values=fast-api-worker" \
+    --filters "Name=tag:Type,Values=${FAST_API_WORKER_TAG}" \
                 "Name=instance-state-name,Values=running,stopped" \
     --query 'Reservations[0].Instances[0].[InstanceId,State.Name,PublicIpAddress]' \
     --output text \
@@ -101,7 +108,7 @@ if [ "$INSTANCE_ID" = "None" ]; then
     
     # Get the new instance details
     FAST_API_INSTANCE=$(aws ec2 describe-instances \
-        --filters "Name=tag:Type,Values=fast-api-worker" \
+        --filters "Name=tag:Type,Values=${FAST_API_WORKER_TAG}" \
                     "Name=instance-state-name,Values=running" \
         --query 'Reservations[0].Instances[0].[InstanceId,State.Name,PublicIpAddress]' \
         --output text \
@@ -131,7 +138,7 @@ echo "   Status: running"
 
 # Test FastAPI health
 echo -e "\n${GREEN}[STEP 2]${NC} Testing FastAPI server health..."
-if curl -s --max-time 5 "http://${PUBLIC_IP}:8000/health" > /dev/null 2>&1; then
+if curl -s --max-time ${HEALTH_CHECK_TIMEOUT} "http://${PUBLIC_IP}:${FAST_API_PORT}/health" > /dev/null 2>&1; then
     echo -e "${GREEN}✅ FastAPI server is healthy${NC}"
     FAST_API_HEALTHY=true
 else
@@ -161,7 +168,7 @@ if [ "$MESSAGES_IN_QUEUE" -gt 0 ] || [ "$FAST_API_HEALTHY" = false ]; then
     
     # Check if a worker is already running
     WORKER_RUNNING=$(aws ec2 describe-instances \
-        --filters "Name=tag:Type,Values=sqs-worker" \
+        --filters "Name=tag:Type,Values=${SQS_WORKER_TAG}" \
                     "Name=instance-state-name,Values=running" \
         --query 'Reservations[0].Instances[0].InstanceId' \
         --output text \
@@ -208,9 +215,9 @@ echo -e "✅ EventBridge: ${GREEN}Configured${NC} (${EVENT_BUS_NAME})"
 echo -e "✅ Lambda Router: ${GREEN}Deployed${NC} (${TRANSCRIPTION_ROUTER_FUNCTION_NAME})"
 
 if [ "$FAST_API_HEALTHY" = true ]; then
-    echo -e "✅ FastAPI Server: ${GREEN}Healthy${NC} (http://${PUBLIC_IP}:8000)"
+    echo -e "✅ FastAPI Server: ${GREEN}Healthy${NC} (http://${PUBLIC_IP}:${FAST_API_PORT})"
 else
-    echo -e "⚠️  FastAPI Server: ${YELLOW}Starting up${NC} (http://${PUBLIC_IP}:8000)"
+    echo -e "⚠️  FastAPI Server: ${YELLOW}Starting up${NC} (http://${PUBLIC_IP}:${FAST_API_PORT})"
 fi
 
 if [ "$MESSAGES_IN_QUEUE" -gt 0 ]; then
@@ -231,7 +238,7 @@ echo -e "\n${CYAN}How to Test:${NC}"
 echo "1. Upload audio file through frontend application"
 echo "2. Check CloudWatch logs: /aws/lambda/${TRANSCRIPTION_ROUTER_FUNCTION_NAME}"
 echo "3. Monitor SQS queue: $QUEUE_URL"
-echo "4. Check FastAPI logs: http://${PUBLIC_IP}:8000/docs"
+echo "4. Check FastAPI logs: http://${PUBLIC_IP}:${FAST_API_PORT}/docs"
 
 if [ "$MESSAGES_IN_QUEUE" -gt 0 ]; then
     echo -e "\n${YELLOW}📌 Note:${NC} ${MESSAGES_IN_QUEUE} messages are queued and will be processed by the worker"
@@ -245,7 +252,7 @@ echo -e "${GREEN}✅ Transcription System Ready${NC}"
 echo -e "${BLUE}======================================${NC}"
 echo
 echo -e "${GREEN}[SYSTEM READY]${NC}"
-echo "• FastAPI server: ${PUBLIC_IP}:8000"
+echo "• FastAPI server: ${PUBLIC_IP}:${FAST_API_PORT}"
 echo "• SQS queue: ${QUEUE_URL}"
 echo "• Lambda router: ${TRANSCRIPTION_ROUTER_FUNCTION_NAME}"
 echo
