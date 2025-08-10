@@ -5,6 +5,8 @@ import requests
 from datetime import datetime
 import subprocess
 import tempfile
+import time
+import random
 
 # Initialize AWS clients
 sqs = boto3.client('sqs')
@@ -247,6 +249,72 @@ def trigger_session_combination(s3_bucket, user_id, session_id):
         print(f"Error combining session transcripts: {e}")
         return False
 
+def retry_with_exponential_backoff(func, max_retries=3, base_delay=1.0, max_delay=16.0, jitter=True):
+    """
+    Retry a function with exponential backoff
+    
+    Args:
+        func: Function to retry (should return tuple of (success, result, error))
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay in seconds
+        max_delay: Maximum delay in seconds
+        jitter: Add random jitter to prevent thundering herd
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            success, result, error = func()
+            if success:
+                return result
+            
+            if attempt == max_retries:
+                print(f"Final attempt failed: {error}")
+                raise Exception(error)
+            
+            # Calculate exponential backoff delay
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            if jitter:
+                delay = delay * (0.5 + random.random() * 0.5)  # Add ±25% jitter
+            
+            print(f"Attempt {attempt + 1} failed: {error}. Retrying in {delay:.2f}s...")
+            time.sleep(delay)
+            
+        except Exception as e:
+            if attempt == max_retries:
+                print(f"Retry mechanism failed: {e}")
+                raise
+            
+            delay = min(base_delay * (2 ** attempt), max_delay)
+            if jitter:
+                delay = delay * (0.5 + random.random() * 0.5)
+            
+            print(f"Exception on attempt {attempt + 1}: {e}. Retrying in {delay:.2f}s...")
+            time.sleep(delay)
+
+def try_fastapi_transcription(server_url, request_data):
+    """
+    Single attempt at FastAPI transcription
+    Returns: (success: bool, result: dict, error: str)
+    """
+    try:
+        response = requests.post(
+            f"{server_url}/transcribe-s3",
+            json=request_data,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            return True, response.json(), None
+        else:
+            error_msg = f"FastAPI returned {response.status_code}: {response.text}"
+            return False, None, error_msg
+            
+    except requests.exceptions.Timeout:
+        return False, None, "FastAPI request timed out"
+    except requests.exceptions.ConnectionError:
+        return False, None, "Failed to connect to FastAPI server"
+    except Exception as e:
+        return False, None, f"FastAPI request failed: {str(e)}"
+
 def send_to_fastapi(server_url, event_data):
     """Send transcription request directly to FastAPI server"""
     try:
@@ -278,6 +346,28 @@ def send_to_fastapi(server_url, event_data):
         # Build proper output path under user's transcripts directory (note: transcripts not transcriptions)
         if user_id and session_id and chunk_name:
             output_path = f"s3://{s3_bucket}/users/{user_id}/transcripts/{session_id}-{chunk_name}.json"
+            transcript_key = f"users/{user_id}/transcripts/{session_id}-{chunk_name}.json"
+            
+            # Check if transcript already exists (idempotent processing)
+            try:
+                s3.head_object(Bucket=s3_bucket, Key=transcript_key)
+                print(f"Transcript already exists for {chunk_name}, skipping transcription")
+                return {
+                    'statusCode': 200,
+                    'body': json.dumps({
+                        'message': 'Transcript already exists',
+                        'method': 'skipped',
+                        's3_output_path': output_path
+                    })
+                }
+            except s3.exceptions.NoSuchKey:
+                # Transcript doesn't exist, proceed with transcription
+                print(f"No existing transcript found for {chunk_name}, proceeding with transcription")
+                pass
+            except Exception as e:
+                print(f"Error checking for existing transcript: {e}")
+                # Continue with transcription if we can't check
+                pass
         else:
             # Fallback to original logic if parsing fails
             output_path = f"s3://{s3_bucket}/transcripts/{s3_key}.json"
@@ -290,15 +380,22 @@ def send_to_fastapi(server_url, event_data):
             "return_text": True
         }
         
-        # Send to FastAPI
-        response = requests.post(
-            f"{server_url}/transcribe-s3",
-            json=request_data,
-            timeout=30  # Longer timeout for transcription
-        )
+        # Retry FastAPI transcription with exponential backoff
+        print(f"Starting transcription for {chunk_name} with retry mechanism")
         
-        if response.status_code == 200:
-            print(f"FastAPI transcription successful: {response.status_code}")
+        def attempt_transcription():
+            return try_fastapi_transcription(server_url, request_data)
+        
+        try:
+            # Attempt transcription with retries (3 attempts: immediate, +1s, +2s, +4s delays)
+            result = retry_with_exponential_backoff(
+                attempt_transcription,
+                max_retries=3,
+                base_delay=1.0,
+                max_delay=8.0
+            )
+            
+            print(f"FastAPI transcription successful after retries")
             
             # After successful transcription, check if session is complete
             if user_id and session_id:
@@ -313,12 +410,15 @@ def send_to_fastapi(server_url, event_data):
                 'statusCode': 200,
                 'body': json.dumps({
                     'message': 'Transcription completed',
-                    'method': 'direct',
-                    'result': response.json()
+                    'method': 'direct-with-retry',
+                    'result': result
                 })
             }
-        else:
-            raise Exception(f"FastAPI returned {response.status_code}: {response.text}")
+            
+        except Exception as fastapi_error:
+            # FastAPI failed after all retries, fall back to SQS
+            print(f"FastAPI failed after retries: {fastapi_error}. Falling back to SQS")
+            return send_to_sqs(event_data)
             
     except Exception as e:
         print(f"Error sending to FastAPI: {e}")
