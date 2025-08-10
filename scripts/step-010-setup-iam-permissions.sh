@@ -347,11 +347,14 @@ cat > /tmp/transcription-worker-policy.json << EOF
         "s3:GetObject",
         "s3:PutObject",
         "s3:DeleteObject",
-        "s3:ListBucket"
+        "s3:ListBucket",
+        "s3:HeadObject"
       ],
       "Resource": [
         "arn:aws:s3:::$METRICS_BUCKET/*",
         "arn:aws:s3:::$AUDIO_BUCKET/*",
+        "arn:aws:s3:::$AUDIO_BUCKET/users/*",
+        "arn:aws:s3:::$AUDIO_BUCKET/transcriptions/*",
         "arn:aws:s3:::$QUEUE_PREFIX-*/*",
         "arn:aws:s3:::$METRICS_BUCKET",
         "arn:aws:s3:::$AUDIO_BUCKET",
