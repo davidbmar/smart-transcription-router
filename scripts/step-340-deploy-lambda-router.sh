@@ -111,6 +111,19 @@ cat > lambda-policy.json << EOF
                 "ec2:DescribeInstances"
             ],
             "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:HeadObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${AUDIO_BUCKET}",
+                "arn:aws:s3:::${AUDIO_BUCKET}/*"
+            ]
         }
     ]
 }
@@ -156,7 +169,7 @@ else
         --timeout 30 \
         --memory-size 512 \
         --environment "Variables={SQS_QUEUE_URL=$SQS_QUEUE_URL,FAST_API_TAG=fast-api-worker}" \
-        --description "Routes transcription requests to FastAPI or SQS" \
+        --description "Routes transcription requests with exponential backoff retry to FastAPI or SQS" \
         --region "$AWS_REGION"
 fi
 
@@ -189,10 +202,11 @@ echo "2. Test the router:"
 echo "   ./scripts/step-342-test-lambda-router.sh"
 echo
 echo -e "${YELLOW}[ROUTING LOGIC]${NC}"
-echo "• Checks for running FastAPI instances"
-echo "• Routes to FastAPI if available (low latency)"
-echo "• Falls back to SQS queue if unavailable"
-echo "• Supports 'force_batch' flag to always use SQS"
+echo "• Idempotent processing: Skips if transcript already exists"
+echo "• Exponential backoff: Retries FastAPI up to 3 times (1s, 2s, 4s delays)"
+echo "• FastAPI first: Routes to FastAPI if available (low latency)"
+echo "• SQS fallback: Falls back to SQS queue if FastAPI fails after retries"
+echo "• Auto session combination: Creates session transcripts when chunks complete"
 
 # Load next-step helper and show next step
 if [ -f "$(dirname "$0")/next-step-helper.sh" ]; then
