@@ -66,10 +66,31 @@ def send_to_fastapi(server_url, event_data):
         if not s3_bucket or not s3_key:
             raise ValueError("Missing S3 bucket or key in event data")
         
+        # Extract user ID from the S3 key to build proper output path
+        # Expected format: users/{userId}/audio/sessions/{sessionId}/chunk-XXX.webm
+        user_id = None
+        session_id = None
+        chunk_name = None
+        
+        if s3_key.startswith('users/') and '/audio/sessions/' in s3_key:
+            parts = s3_key.split('/')
+            if len(parts) >= 5:
+                user_id = parts[1]  # users/{userId}/...
+                session_id = parts[4]  # .../sessions/{sessionId}/...
+                chunk_name = parts[-1].replace('.webm', '')  # chunk-001.webm -> chunk-001
+        
+        # Build proper output path under user's transcriptions directory
+        if user_id and session_id and chunk_name:
+            output_path = f"s3://{s3_bucket}/users/{user_id}/transcriptions/{session_id}-{chunk_name}.json"
+        else:
+            # Fallback to original logic if parsing fails
+            output_path = f"s3://{s3_bucket}/transcriptions/{s3_key}.json"
+            print(f"Warning: Could not parse user structure from key {s3_key}, using fallback path")
+        
         # Prepare request for FastAPI
         request_data = {
             "s3_input_path": f"s3://{s3_bucket}/{s3_key}",
-            "s3_output_path": f"s3://{s3_bucket}/transcriptions/{s3_key}.json",
+            "s3_output_path": output_path,
             "return_text": True
         }
         
